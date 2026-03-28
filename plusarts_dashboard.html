@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>플러스아츠 안내문 대시보드</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root {
+  --coral: #E8735A;
+  --coral-light: #FAF0ED;
+  --coral-mid: #F5C4B3;
+  --coral-dark: #7A3628;
+  --warm-white: #FDFAF8;
+  --warm-gray: #F5F0EC;
+  --border: #EDE5DF;
+  --text: #2C1F1A;
+  --text-muted: #9A8880;
+  --text-light: #C4B8B2;
+  --green: #4A7C59;
+  --green-light: #EAF3DE;
+  --blue: #3A6EA8;
+  --blue-light: #E6F1FB;
+  --red: #C0392B;
+  --red-light: #FCEBEB;
+  --amber-light: #FAEEDA;
+  --amber: #9A6B1F;
+  --shadow: 0 2px 12px rgba(44,31,26,0.07);
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Noto Sans KR', sans-serif;
+  background: var(--warm-white);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ── 사이드바 레이아웃 ── */
+.app { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--text);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 100;
+}
+
+.sidebar-brand {
+  padding: 28px 24px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.brand-logo {
+  width: 36px; height: 36px;
+  background: var(--coral);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Serif Display', serif;
+  font-size: 16px; color: white;
+  margin-bottom: 10px;
+}
+
+.brand-name {
+  font-size: 13px; font-weight: 700;
+  color: white; line-height: 1.3;
+}
+
+.brand-sub {
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  margin-top: 2px;
+}
+
+.nav { padding: 16px 12px; flex: 1; }
+
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: rgba(255,255,255,0.5);
+  font-size: 13px;
+  font-weight: 400;
+  transition: all .15s;
+  margin-bottom: 2px;
+  border: none; background: none; width: 100%; text-align: left;
+}
+
+.nav-item:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.8); }
+
+.nav-item.active {
+  background: var(--coral);
+  color: white;
+  font-weight: 500;
+}
+
+.nav-icon { font-size: 16px; flex-shrink: 0; }
+
+.sidebar-footer {
+  padding: 16px 24px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  font-size: 11px;
+  color: rgba(255,255,255,0.25);
+}
+
+/* ── 메인 콘텐츠 ── */
+.main {
+  margin-left: 220px;
+  flex: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  height: 60px;
+  background: var(--warm-white);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 32px;
+  gap: 12px;
+  position: sticky; top: 0; z-index: 50;
+}
+
+.page-title {
+  font-size: 15px; font-weight: 700;
+  color: var(--text);
+}
+
+.topbar-right { margin-left: auto; display: flex; gap: 8px; }
+
+.stat-pill {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--warm-gray);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+.stat-pill .val { font-weight: 700; color: var(--coral); }
+
+.content { padding: 28px 32px; flex: 1; }
+
+/* ── 패널 ── */
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* ── 공통 컴포넌트 ── */
+.card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow);
+}
+
+.section-label {
+  font-size: 11px; font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 10px;
+}
+
+label { font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px; font-weight: 500; }
+
+input, select, textarea {
+  width: 100%;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--warm-gray);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  margin-bottom: 10px;
+  outline: none;
+  transition: border-color .15s, background .15s;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--coral);
+  background: white;
+}
+
+textarea { resize: vertical; line-height: 1.7; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--text);
+  font-family: 'Noto Sans KR', sans-serif;
+  transition: all .12s;
+}
+.btn:hover { background: var(--warm-gray); }
+.btn:active { transform: scale(.98); }
+
+.btn-coral { background: var(--coral); border-color: var(--coral); color: white; }
+.btn-coral:hover { background: #D4614A; border-color: #D4614A; }
+.btn-green { background: var(--green-light); border-color: #97C459; color: var(--green); }
+.btn-green:hover { background: #C0DD97; }
+.btn-blue { background: var(--blue-light); border-color: #85B7EB; color: var(--blue); }
+.btn-blue:hover { background: #B5D4F4; }
+.btn-red { background: var(--red-light); border-color: #F09595; color: var(--red); }
+.btn-red:hover { background: #F7C1C1; }
+.btn-sm { padding: 5px 10px; font-size: 11px; }
+
+.badge {
+  display: inline-flex; align-items: center;
+  font-size: 10px; font-weight: 700;
+  padding: 2px 7px; border-radius: 99px;
+}
+.badge-done { background: var(--green-light); color: var(--green); }
+.badge-pending { background: var(--amber-light); color: var(--amber); }
+.badge-edited { background: var(--blue-light); color: var(--blue); }
+.badge-new { background: var(--coral-light); color: var(--coral-dark); }
+
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+/* ── 홈 ── */
+.metrics-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+
+.metric-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: var(--shadow);
+}
+.metric-card .label { font-size: 11px; color: var(--text-muted); font-weight: 500; margin-bottom: 6px; }
+.metric-card .val { font-size: 28px; font-weight: 700; color: var(--coral); line-height: 1; }
+.metric-card .sub { font-size: 11px; color: var(--text-light); margin-top: 4px; }
+
+.home-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.search-bar {
+  position: relative; margin-bottom: 14px;
+}
+.search-bar input { margin: 0; padding-left: 34px; }
+.search-bar::before {
+  content: '🔍';
+  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  font-size: 13px; pointer-events: none;
+}
+
+.stu-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transition: border-color .15s;
+}
+.stu-card.open { border-color: var(--coral); }
+
+.stu-hdr {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px;
+  cursor: pointer;
+}
+.stu-hdr:hover { background: var(--warm-gray); }
+
+.stu-avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--coral-light);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: var(--coral-dark);
+  flex-shrink: 0;
+}
+
+.stu-name { font-size: 14px; font-weight: 700; }
+.stu-meta { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+.progress-wrap { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.progress-bar {
+  width: 70px; height: 5px;
+  background: var(--warm-gray);
+  border-radius: 99px; overflow: hidden;
+}
+.progress-fill { height: 100%; background: var(--coral); border-radius: 99px; transition: width .3s; }
+.progress-pct { font-size: 11px; color: var(--text-muted); min-width: 28px; text-align: right; }
+
+.stu-detail { display: none; padding: 0 18px 16px; border-top: 1px solid var(--border); }
+.stu-detail.open { display: block; }
+
+.notice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px; margin: 12px 0;
+}
+
+.notice-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  font-size: 11px; font-weight: 500;
+  cursor: pointer;
+  background: var(--warm-gray);
+  color: var(--text-muted);
+  transition: all .12s;
+  user-select: none;
+}
+.notice-chip:hover { border-color: var(--coral-mid); }
+.notice-chip.sent { background: var(--green-light); border-color: #97C459; color: var(--green); }
+.notice-chip .chip-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.notice-chip .chip-cnt { margin-left: auto; font-size: 10px; opacity: .7; }
+
+.stu-actions { display: flex; gap: 6px; margin-top: 10px; }
+
+/* ── 편집 사이드바 ── */
+.edit-layout { display: grid; grid-template-columns: 200px 1fr; gap: 14px; }
+
+.edit-list-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: white;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.edit-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  padding: 9px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  transition: background .12s;
+  background: none; border-left: none; border-right: none; border-top: none;
+  width: 100%; text-align: left;
+}
+.edit-item:last-child { border-bottom: none; }
+.edit-item:hover { background: var(--warm-gray); }
+.edit-item.selected { background: var(--coral-light); color: var(--coral-dark); font-weight: 600; }
+
+.var-info {
+  background: var(--warm-gray);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+.var-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.var-chip {
+  font-size: 11px; padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: white; border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer; font-family: monospace;
+  transition: all .12s;
+}
+.var-chip:hover { background: var(--blue-light); color: var(--blue); border-color: #85B7EB; }
+
+.preview-text {
+  white-space: pre-wrap; font-size: 12px; line-height: 1.8;
+  background: var(--warm-gray);
+  border-radius: var(--radius-sm);
+  padding: 14px; color: var(--text);
+  border: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+/* ── 발송이력 ── */
+.log-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.log-row:last-child { border-bottom: none; }
+.log-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--coral); flex-shrink: 0; margin-top: 5px; }
+
+/* ── 월별일정 ── */
+.season-hdr {
+  font-size: 12px; font-weight: 700;
+  color: var(--text-muted); padding: 12px 0 6px;
+  text-transform: uppercase; letter-spacing: .06em;
+  display: flex; align-items: center; gap: 6px;
+}
+.checklist-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.checklist-row:last-child { border-bottom: none; }
+.checklist-row input[type=checkbox] { width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--coral); cursor: pointer; }
+.checklist-label { flex: 1; font-size: 13px; cursor: pointer; }
+.checklist-target { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+
+/* ── 모달 ── */
+.modal-bg {
+  display: none; position: fixed; inset: 0;
+  background: rgba(44,31,26,.45);
+  z-index: 200; align-items: center; justify-content: center;
+}
+.modal-bg.open { display: flex; }
+.modal {
+  background: white; border-radius: var(--radius);
+  padding: 24px 28px; width: 380px;
+  box-shadow: 0 8px 40px rgba(44,31,26,.2);
+}
+.modal-title { font-size: 15px; font-weight: 700; margin-bottom: 14px; }
+
+/* ── 알림 토스트 ── */
+.toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--text);
+  color: white;
+  padding: 12px 18px; border-radius: var(--radius-sm);
+  font-size: 13px;
+  box-shadow: 0 4px 20px rgba(44,31,26,.3);
+  transform: translateY(80px); opacity: 0;
+  transition: all .25s cubic-bezier(.34,1.56,.64,1);
+  z-index: 999; pointer-events: none;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast.ok::before { content: '✓  '; color: #7CCC88; }
+.toast.warn::before { content: '⚠  '; color: #FABB4A; }
+
+.empty-state {
+  text-align: center; padding: 40px;
+  color: var(--text-muted); font-size: 13px; line-height: 1.8;
+}
+
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; }
+  .content { padding: 20px 16px; }
+  .metrics-row { grid-template-columns: 1fr 1fr; }
+  .g2, .g3, .edit-layout { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- 사이드바 -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo">PA</div>
+      <div class="brand-name">플러스아츠<br>유학미술학원</div>
+      <div class="brand-sub">안내문 대시보드</div>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" onclick="showPanel('home',this)">
+        <span class="nav-icon">🏠</span> 홈
+      </button>
+      <button class="nav-item" onclick="showPanel('compose',this)">
+        <span class="nav-icon">✉️</span> 안내문 작성
+      </button>
+      <button class="nav-item" onclick="showPanel('edit',this)">
+        <span class="nav-icon">✏️</span> 템플릿 편집
+      </button>
+      <button class="nav-item" onclick="showPanel('log',this)">
+        <span class="nav-icon">📋</span> 발송 이력
+      </button>
+      <button class="nav-item" onclick="showPanel('schedule',this)">
+        <span class="nav-icon">📅</span> 월별 일정
+      </button>
+    </nav>
+    <div class="sidebar-footer">v1.0 · 플러스아츠 전용</div>
+  </aside>
+
+  <!-- 메인 -->
+  <main class="main">
+    <div class="topbar">
+      <div class="page-title" id="page-title">홈</div>
+      <div class="topbar-right">
+        <div class="stat-pill">오늘 <span class="val" id="cnt-today">0</span>건</div>
+        <div class="stat-pill">전체 <span class="val" id="cnt-total">0</span>건</div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ── 홈 ── -->
+      <div id="panel-home" class="panel active">
+        <div class="metrics-row">
+          <div class="metric-card">
+            <div class="label">등록 학생</div>
+            <div class="val" id="m-students">0</div>
+            <div class="sub">명</div>
+          </div>
+          <div class="metric-card">
+            <div class="label">오늘 발송</div>
+            <div class="val" id="m-today2">0</div>
+            <div class="sub">건</div>
+          </div>
+          <div class="metric-card">
+            <div class="label">전체 발송</div>
+            <div class="val" id="m-total2">0</div>
+            <div class="sub">건</div>
+          </div>
+        </div>
+
+        <div class="home-header">
+          <div class="section-label" style="margin:0">학생별 안내문 현황</div>
+          <button class="btn btn-coral btn-sm" onclick="openAddStu()">+ 학생 추가</button>
+        </div>
+
+        <div class="search-bar">
+          <input id="home-search" placeholder="학생 이름 검색..." oninput="renderHome(this.value)">
+        </div>
+
+        <div id="home-students"></div>
+        <div id="home-empty" class="empty-state" style="display:none">
+          등록된 학생이 없어요.<br>
+          오른쪽 상단의 <strong>+ 학생 추가</strong> 버튼으로 추가해 주세요!
+        </div>
+      </div>
+
+      <!-- ── 안내문 작성 ── -->
+      <div id="panel-compose" class="panel">
+        <div class="card">
+          <div class="g2">
+            <div><label>학생 이름</label><input id="c-name" placeholder="예) 김민지" oninput="generate()"></div>
+            <div>
+              <label>안내문 종류</label>
+              <select id="c-type" onchange="generate()">
+                <option value="">-- 선택해 주세요 --</option>
+              </select>
+            </div>
+          </div>
+          <div id="extra-fields"></div>
+        </div>
+        <div class="card">
+          <div class="section-label">미리보기</div>
+          <textarea id="c-preview" style="min-height:160px" readonly placeholder="위에서 학생 이름과 안내문 종류를 선택하면 자동으로 완성됩니다 😊"></textarea>
+          <div class="btn-row">
+            <button class="btn btn-coral" onclick="copyText()">📋 복사하기</button>
+            <button class="btn btn-green" onclick="saveLog()">✅ 발송 완료 기록</button>
+            <button class="btn" onclick="clearCompose()">↺ 초기화</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 템플릿 편집 ── -->
+      <div id="panel-edit" class="panel">
+        <div class="var-info">
+          <strong>변수 삽입</strong> — 클릭하면 커서 위치에 삽입돼요. 안내문 작성 시 입력한 값으로 자동 교체됩니다.
+          <div class="var-chips">
+            <span class="var-chip" onclick="insertVar('{이름}')">{이름}</span>
+            <span class="var-chip" onclick="insertVar('{날짜}')">{날짜}</span>
+            <span class="var-chip" onclick="insertVar('{요일}')">{요일}</span>
+            <span class="var-chip" onclick="insertVar('{시간}')">{시간}</span>
+            <span class="var-chip" onclick="insertVar('{학교명}')">{학교명}</span>
+            <span class="var-chip" onclick="insertVar('{비용}')">{비용}</span>
+            <span class="var-chip" onclick="insertVar('{링크}')">{링크}</span>
+            <span class="var-chip" onclick="insertVar('{회차}')">{회차}</span>
+            <span class="var-chip" onclick="insertVar('{일정1}')">{일정1}</span>
+            <span class="var-chip" onclick="insertVar('{일정2}')">{일정2}</span>
+            <span class="var-chip" onclick="insertVar('{일정3}')">{일정3}</span>
+            <span class="var-chip" onclick="insertVar('{명절}')">{명절}</span>
+            <span class="var-chip" onclick="insertVar('{기간}')">{기간}</span>
+            <span class="var-chip" onclick="insertVar('{재개일}')">{재개일}</span>
+          </div>
+        </div>
+
+        <div class="edit-layout">
+          <div>
+            <div class="edit-list-wrap" id="edit-list"></div>
+            <button class="btn btn-coral" style="width:100%;margin-top:8px;justify-content:center" onclick="openNewTpl()">+ 새 템플릿 추가</button>
+          </div>
+          <div>
+            <div style="margin-bottom:8px">
+              <label id="edit-label" style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px">안내문을 선택하거나 새로 추가해 주세요</label>
+              <textarea id="edit-area" style="min-height:300px" placeholder="왼쪽에서 안내문을 선택하면 편집할 수 있어요 ✏️" oninput="hideEditPreview()"></textarea>
+            </div>
+            <div class="btn-row" style="margin-bottom:8px">
+              <button class="btn btn-coral" onclick="saveTemplate()">💾 저장하기</button>
+              <button class="btn btn-blue" onclick="previewEdit()">👁 미리보기</button>
+              <button class="btn" onclick="resetTemplate()">↺ 원본으로</button>
+              <button class="btn btn-red" onclick="deleteTemplate()" id="btn-delete" style="display:none">🗑 삭제</button>
+            </div>
+            <div id="edit-preview-box" style="display:none">
+              <div class="section-label" style="margin-top:4px">미리보기 — 샘플값 적용</div>
+              <div class="preview-text" id="edit-preview-text"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 발송 이력 ── -->
+      <div id="panel-log" class="panel">
+        <div class="g2" style="margin-bottom:14px">
+          <div class="metric-card"><div class="label">오늘 발송</div><div class="val" id="log-today">0</div></div>
+          <div class="metric-card"><div class="label">이번 달</div><div class="val" id="log-month">0</div></div>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div class="section-label" style="margin:0">발송 이력</div>
+            <button class="btn btn-sm" onclick="clearLog()">이력 초기화</button>
+          </div>
+          <div id="log-list"></div>
+        </div>
+      </div>
+
+      <!-- ── 월별 일정 ── -->
+      <div id="panel-schedule" class="panel">
+        <div class="card">
+          <div id="schedule-content"></div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:8px">
+          <button class="btn btn-coral" onclick="saveChecks()">💾 저장하기</button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- 모달: 학생 추가 -->
+<div class="modal-bg" id="modal-add-stu">
+  <div class="modal">
+    <div class="modal-title">학생 추가</div>
+    <label>학생 이름 *</label>
+    <input id="new-stu-name" placeholder="예) 김민지">
+    <label>수업 정보 (선택)</label>
+    <input id="new-stu-info" placeholder="예) 화/목 14:00">
+    <div class="btn-row" style="justify-content:flex-end;margin-top:4px">
+      <button class="btn" onclick="closeModal('modal-add-stu')">취소</button>
+      <button class="btn btn-coral" onclick="addStudent()">추가하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 모달: 새 템플릿 -->
+<div class="modal-bg" id="modal-new-tpl">
+  <div class="modal">
+    <div class="modal-title">새 템플릿 추가</div>
+    <label>템플릿 이름 *</label>
+    <input id="new-tpl-name" placeholder="예) 합격 축하 공지">
+    <div class="btn-row" style="justify-content:flex-end;margin-top:4px">
+      <button class="btn" onclick="closeModal('modal-new-tpl')">취소</button>
+      <button class="btn btn-coral" onclick="createNewTpl()">만들기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 토스트 -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── 데이터 ──────────────────────────────────────────────
+const BASE_TEMPLATES = {
+'신규 등록 인사':'안녕하세요. 플러스아츠미술학원장 김연희입니다. {이름} 학생의 등록을 진심으로 환영합니다!\n\n수업 시작에 앞서 진행되어야 할 필수 절차를 안내드립니다. 작성 및 확인 후 \'완료\' 메시지를 톡으로 남겨주세요.\n\n1. 지원자 정보 입력: https://forms.gle/xvKFWfXYV3ixv14f7\n2. 수강 계약서 서명: https://dub.sh/RZsj51x\n3. 학원 필수 안내사항 확인: https://dub.sh/eYqaf0M',
+'첫 수업 안내':'💖 첫수업 관련안내💖\n\n안녕하세요! 플러스아츠학원의 연쌤입니다!\n{이름}학생의 첫수업이 아래의 일정으로 예정되어 있습니다.\n\n💖수업일정: {날짜} {요일} {시간}\n\n💖준비물\n- 가지고 있는 미술작업들은 사진으로 찍어서, 이 방에 공유해주시면 좋을 것 같습니다.\n- 수채화붓, 유화붓과 같은 소모성 개인제품들은 가지고 오셔도 좋습니다. 학원에 공용재료가 있습니다^^',
+'1:1 포트폴리오 중간 점검 안내':'💯미술학원 1:1 포트폴리오 중간 점검 안내\n\n안녕하세요. 플러스아츠학원의 김연희 원장입니다! {이름}학생의 1:1 포트폴리오 중간 점검과 관련된 미팅 예약이 필요합니다. 아래의 링크를 통해, 미팅예약을 이번주 토요일까지 끝내주시기 바랍니다. 미팅은 약 30분~1시간 가량 진행될예정입니다🥰\n\n👉미팅예약링크: {링크}\n👉준비사항: 미팅시간 전까지, 현재하고 있는 작업들과 이에 대한 DOP를 최대한 작성하시기 바랍니다.',
+'포트폴리오 제출 완료 안내':'❤포트폴리오 업로드및제출완료안내❤\n\n안녕하세요. {이름}학생의 {학교명} 포트폴리오 업로드 및 검수완료를 안내드립니다.\n컨펌 해주시면 바로 제출 진행할예정입니다.\n\n{학교명}의 제출비용은 {비용}불입니다!\n대행 제출의 경우, 수업 1회분이 차감됨을 다시한번 안내드립니다❤',
+'포트폴리오 리뷰 PPT 안내':'💖포트폴리오 리뷰 PPT관련 안내💖\n\n안녕하세요😀 플러스아츠유학미술학원의 연쌤입니다! 10월중순부터 11월말까지 입학사정관님들의 포트폴리오 리뷰 세션들이 이루어지고 있습니다.\n\n💖{이름}학생의 포트폴리오 PPT 링크:\n{링크}\n\n피드백을 바탕으로 계속해서 포트폴리오 PPT를 업데이트 하는 것이 매우 중요합니다^^ 화이팅!',
+'얼리 지원 안내':'❤얼리지원 관련 미술학원 안내❤\n\n안녕하세요☺️플러스아츠유학미술학원의 연쌤입니다!\n\n❤현재 {이름}학생의 얼리지원 학교:\n{학교명}\n\n포트폴리오 제출 과정:\n1) 지원 학교의 원서계정오픈\n2) 슬라이드룸 계정생성\n3) Common App연동\n4) 포트폴리오 업로드 및 DOP검수\n5) 제출(*보통 마감일 1주일전 제출)\n*포트폴리오 제출시점에 반드시 원서가 먼저 제출이 되어 있어야 합니다.',
+'After Class 안내':'❤플러스아츠 After Class 안내❤\n\n안녕하세요. 플러스아츠 유학미술학원의 연쌤입니다.\n\n1. Art History (온라인)\n수강기간: 3/28(토), 약 12주 / 매주 토요일 11am–2pm\n\n2. Adobe Photoshop & Illustration (오프라인)\n수강기간: 3/25(수), 약 12주 / 매주 수요일 11am-2pm',
+'온라인 OT 안내':'❤플러스아츠 온라인 OT 안내❤\n\n안녕하세요. 플러스아츠학원의 연쌤입니다.\n이제 3월 신학기가 시작되었습니다. 올해 입시를 준비하는 학생들도 마음을 다잡고 목표를 향해 나아갈 준비를 하고 있습니다.\n\n일정: {날짜}(일) 오후 {시간}(약 1시간)\n방법: 구글 온라인 미팅\n대상: 올해 입시를 준비하는 모든 학생및 학부모\n*참석이 어려운 학생들의 경우, 미리 전달부탁드립니다.',
+'여름방학 특강 안내':'💖 여름방학 특강수업 안내\n\n안녕하세요~ 플러스아츠 유학미술학원 김연희 원장입니다. 😊\n여름방학 일정 스케줄을 학원 등록 학생들을 대상으로 우선 예약 진행하고 있습니다. 통화 가능하신 시간을 알려주시면 맞춰서 연락드리겠습니다.\n\n확인되시는 대로 회신 부탁드립니다. 감사합니다!',
+'겨울방학 특강 안내':'💖 겨울방학 특강수업 안내\n\n안녕하세요~ 플러스아츠 유학미술학원 김연희 원장입니다. 😊\n겨울방학 일정 스케줄을 학원 등록 학생들을 대상으로 우선 예약 진행하고 있습니다. 통화 가능하신 시간을 알려주시면 맞춰서 연락드리겠습니다.\n\n확인되시는 대로 회신 부탁드립니다. 감사합니다!',
+'결강 및 보강 안내':'❤결강 및 보강안내❤\n\n안녕하세요☺️플러스아츠유학미술학원의 연쌤입니다!\n현재 {이름}학생의 수업결강분이 {회차}회 남아있습니다. 보강수업을 위해, 아래의 일정중 가능한 일정을 말씀해주세요.\n\n일정1. {일정1}\n일정2. {일정2}\n일정3. {일정3}',
+'명절 휴원 안내':'안녕하세요 🌿 플러스아츠유학미술학원의 연쌤입니다 😊\n\n🎎 {명절} 휴원 안내\n\n따뜻한 {명절} 보내세요! 🙏\n\n🗓 휴원 기간: {기간}\n📚 정상 수업 재개: {재개일}',
+'보관 물품 회수 안내':'❤보관 물품 회수 안내❤\n\n안녕하세요 플러스아츠입니다. {이름} 학생의 작품/소지품을 보관중입니다. 회수 가능하신 날짜를 알려주시면 픽업하실 수 있도록 준비해 두겠습니다.\n\n본 안내문 수신후 14일 이내 회수가 이루어지지 않을 경우, 보관물품이 임의 폐기됨을 양해 부탁드립니다. 감사합니다.'
+};
+
+const EXTRA_FIELDS = {
+'첫 수업 안내':[{id:'f1',label:'날짜',ph:'예) 4월 3일',v:'날짜'},{id:'f2',label:'요일',ph:'예) 화요일',v:'요일'},{id:'f3',label:'시간',ph:'예) 14:00',v:'시간'}],
+'1:1 포트폴리오 중간 점검 안내':[{id:'f1',label:'미팅 링크',ph:'https://...',v:'링크'}],
+'포트폴리오 제출 완료 안내':[{id:'f1',label:'학교명',ph:'예) 프랫',v:'학교명'},{id:'f3',label:'비용(달러)',ph:'예) 75',v:'비용'}],
+'포트폴리오 리뷰 PPT 안내':[{id:'f4',label:'PPT 링크',ph:'https://...',v:'링크'}],
+'얼리 지원 안내':[{id:'f1',label:'지원 학교',ph:'예) RISD, 프랫',v:'학교명'}],
+'온라인 OT 안내':[{id:'f1',label:'날짜',ph:'예) 3월 30일',v:'날짜'},{id:'f3',label:'시간',ph:'예) 2시',v:'시간'}],
+'결강 및 보강 안내':[{id:'f1',label:'결강 회차',ph:'예) 2',v:'회차'},{id:'f2',label:'일정1',ph:'예) 4/5(토) 14:00',v:'일정1'},{id:'f3',label:'일정2',ph:'예) 4/6(일) 15:00',v:'일정2'},{id:'f4',label:'일정3',ph:'예) 4/12(토)',v:'일정3'}],
+'명절 휴원 안내':[{id:'f1',label:'명절',ph:'예) 추석',v:'명절'},{id:'f2',label:'휴원 기간',ph:'예) 9/14~16',v:'기간'},{id:'f3',label:'재개일',ph:'예) 9/17(화)',v:'재개일'}]
+};
+
+const SAMPLE = {이름:'김민지',날짜:'4월 3일',요일:'화요일',시간:'14:00',학교명:'프랫',비용:'75',링크:'https://example.com',회차:'2',일정1:'4/5(토) 14:00',일정2:'4/6(일) 15:00',일정3:'4/12(토) 14:00',명절:'추석',기간:'9/14~16',재개일:'9/17(화)'};
+
+const SCHEDULE_DATA = {
+  s1:{label:'🌸 3~4월',items:[{id:'c1',label:'신규 등록 인사 안내문',target:'신규 학생/학부모'},{id:'c2',label:'첫 수업 안내문',target:'신규 학생'},{id:'c3',label:'온라인 OT 안내',target:'입시반 전체'},{id:'c4',label:'1:1 포트폴리오 중간 점검 안내',target:'입시반'}]},
+  s2:{label:'☀️ 6~7월',items:[{id:'c5',label:'여름방학 특강 안내',target:'전체'},{id:'c6',label:'얼리 지원 안내 (준비)',target:'입시반'}]},
+  s3:{label:'🍂 8~9월',items:[{id:'c7',label:'얼리 지원 안내 (본격)',target:'입시반'},{id:'c8',label:'포트폴리오 리뷰 PPT 안내',target:'입시반'},{id:'c9',label:'명절 휴원 안내 (추석)',target:'전체'}]},
+  s4:{label:'🍁 10~11월',items:[{id:'c10',label:'포트폴리오 제출 완료 안내',target:'입시반'},{id:'c11',label:'1:1 포트폴리오 중간 점검 안내 (2차)',target:'입시반'}]},
+  s5:{label:'❄️ 12~1월',items:[{id:'c12',label:'겨울방학 특강 안내',target:'전체'},{id:'c13',label:'After Class 안내',target:'수료 학생'},{id:'c14',label:'보관 물품 회수 안내',target:'수료/졸업 학생'},{id:'c15',label:'명절 휴원 안내 (설날)',target:'전체'}]},
+  s6:{label:'🔄 수시',items:[{id:'c16',label:'결강 및 보강 안내',target:'해당 학생'},{id:'c17',label:'온라인 OT 안내 (수시)',target:'신규 등록'}]}
+};
+
+// ── 상태 ───────────────────────────────────────────────
+let logs = JSON.parse(localStorage.getItem('pa_logs')||'[]');
+let checks = JSON.parse(localStorage.getItem('pa_checks')||'{}');
+let customTpls = JSON.parse(localStorage.getItem('pa_tpls')||'{}');
+let userTpls = JSON.parse(localStorage.getItem('pa_user_tpls')||'{}');
+let students = JSON.parse(localStorage.getItem('pa_students')||'[]');
+let currentEditKey = null;
+let isUserTpl = false;
+let openStudentId = null;
+
+// ── 유틸 ───────────────────────────────────────────────
+function getTpl(k){ return customTpls[k]||userTpls[k]||BASE_TEMPLATES[k]||''; }
+function allKeys(){ return [...Object.keys(BASE_TEMPLATES),...Object.keys(userTpls)]; }
+function applyVars(tpl,vals){ return tpl.replace(/\{([^}]+)\}/g,(_,k)=>vals[k]||`(${k})`); }
+
+let toastTimer;
+function toast(msg, type='ok'){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className=`toast ${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),2800);
+}
+
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+function updateCounts(){
+  const today = new Date().toDateString();
+  const todayCnt = logs.filter(l=>new Date(l.ts||0).toDateString()===today).length;
+  document.getElementById('cnt-today').textContent = todayCnt;
+  document.getElementById('cnt-total').textContent = logs.length;
+  document.getElementById('m-today2').textContent = todayCnt;
+  document.getElementById('m-total2').textContent = logs.length;
+  document.getElementById('m-students').textContent = students.length;
+}
+
+// ── 패널 전환 ──────────────────────────────────────────
+const PANEL_TITLES = {home:'홈',compose:'안내문 작성',edit:'템플릿 편집',log:'발송 이력',schedule:'월별 일정'};
+
+function showPanel(id, el){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  el.classList.add('active');
+  document.getElementById('page-title').textContent = PANEL_TITLES[id];
+  if(id==='home') renderHome();
+  if(id==='compose') populateSelect();
+  if(id==='edit'){ renderEditList(); populateSelect(); }
+  if(id==='log') renderLog();
+  if(id==='schedule') renderSchedule();
+}
+
+// ── 홈 ────────────────────────────────────────────────
+function renderHome(q=''){
+  const filtered = q ? students.filter(s=>s.name.includes(q)) : students;
+  const wrap = document.getElementById('home-students');
+  const empty = document.getElementById('home-empty');
+  updateCounts();
+  if(!filtered.length){ wrap.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  const keys = allKeys();
+  wrap.innerHTML = filtered.map(s=>{
+    const sent = s.sent||{};
+    const sentCnt = Object.keys(sent).length;
+    const pct = Math.round(sentCnt/keys.length*100);
+    const isOpen = openStudentId===s.id;
+    return `<div class="stu-card${isOpen?' open':''}">
+      <div class="stu-hdr" onclick="toggleStu('${s.id}')">
+        <div class="stu-avatar">${s.name.slice(0,2)}</div>
+        <div style="flex:1">
+          <div class="stu-name">${s.name}</div>
+          <div class="stu-meta">${s.info||'수업 정보 없음'} &middot; ${sentCnt}/${keys.length}건 발송</div>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+          <span class="progress-pct">${pct}%</span>
+          <button class="btn btn-red btn-sm" onclick="event.stopPropagation();removeStu('${s.id}')">삭제</button>
+        </div>
+      </div>
+      <div class="stu-detail${isOpen?' open':''}">
+        <div class="section-label" style="margin-top:12px">안내문 발송 현황 — 클릭으로 토글</div>
+        <div class="notice-grid">
+          ${keys.map(k=>`
+            <div class="notice-chip${sent[k]?' sent':''}" onclick="markSent('${s.id}','${k}')">
+              <div class="chip-dot"></div>
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${k}</span>
+              ${sent[k]?`<span class="chip-cnt">${sent[k]}</span>`:''}
+            </div>`).join('')}
+        </div>
+        <div class="stu-actions">
+          <button class="btn btn-coral btn-sm" onclick="goCompose('${s.name}')">✉️ 이 학생에게 작성</button>
+          <button class="btn btn-sm" onclick="resetStu('${s.id}')">↺ 현황 초기화</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleStu(id){ openStudentId = openStudentId===id ? null : id; renderHome(document.getElementById('home-search').value); }
+function markSent(id,type){
+  const s=students.find(s=>s.id===id); if(!s)return;
+  if(!s.sent)s.sent={};
+  s.sent[type] ? delete s.sent[type] : s.sent[type]=1;
+  localStorage.setItem('pa_students',JSON.stringify(students));
+  renderHome(document.getElementById('home-search').value);
+}
+function resetStu(id){
+  const s=students.find(s=>s.id===id); if(!s)return;
+  s.sent={}; localStorage.setItem('pa_students',JSON.stringify(students)); renderHome();
+}
+function removeStu(id){
+  if(!confirm('학생을 삭제할까요?'))return;
+  students=students.filter(s=>s.id!==id);
+  if(openStudentId===id)openStudentId=null;
+  localStorage.setItem('pa_students',JSON.stringify(students)); renderHome();
+}
+function goCompose(name){
+  document.getElementById('c-name').value=name;
+  document.querySelectorAll('.nav-item')[1].click();
+}
+function openAddStu(){ openModal('modal-add-stu'); setTimeout(()=>document.getElementById('new-stu-name').focus(),100); }
+function addStudent(){
+  const name=document.getElementById('new-stu-name').value.trim();
+  const info=document.getElementById('new-stu-info').value.trim();
+  if(!name){toast('이름을 입력해 주세요!','warn');return;}
+  if(students.find(s=>s.name===name)){toast('이미 등록된 학생이에요!','warn');return;}
+  students.push({id:Date.now().toString(),name,info,sent:{}});
+  localStorage.setItem('pa_students',JSON.stringify(students));
+  closeModal('modal-add-stu');
+  document.getElementById('new-stu-name').value='';
+  document.getElementById('new-stu-info').value='';
+  renderHome(); toast(`${name} 학생이 추가됐어요!`);
+}
+
+// ── 안내문 작성 ────────────────────────────────────────
+function populateSelect(){
+  const sel=document.getElementById('c-type');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">-- 선택해 주세요 --</option>';
+  allKeys().forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=k; sel.appendChild(o); });
+  if(cur)sel.value=cur;
+}
+
+function generate(){
+  const type=document.getElementById('c-type').value;
+  const name=document.getElementById('c-name').value.trim();
+  const ef=document.getElementById('extra-fields');
+  const extras=EXTRA_FIELDS[type]||[];
+  ef.innerHTML=extras.length?`<div style="display:grid;grid-template-columns:repeat(${Math.min(extras.length,3)},minmax(0,1fr));gap:8px;margin-bottom:2px">${extras.map(e=>`<div><label>${e.label}</label><input id="${e.id}" placeholder="${e.ph}" oninput="generate()"></div>`).join('')}</div>`:'';
+  const pv=document.getElementById('c-preview');
+  if(!name||!type){pv.value='위에서 학생 이름과 안내문 종류를 선택하면 자동으로 완성됩니다 😊';return;}
+  const vals={이름:name};
+  extras.forEach(e=>{const el=document.getElementById(e.id);if(el)vals[e.v]=el.value.trim();});
+  pv.value=applyVars(getTpl(type),vals);
+}
+
+function copyText(){
+  const t=document.getElementById('c-preview').value;
+  if(!t||t.includes('자동으로 완성')){toast('먼저 안내문을 완성해 주세요!','warn');return;}
+  navigator.clipboard.writeText(t).then(()=>toast('복사됐어요! 카카오톡에 붙여넣기 하세요 😊'));
+}
+
+function saveLog(){
+  const name=document.getElementById('c-name').value.trim();
+  const type=document.getElementById('c-type').value;
+  if(!name||!type){toast('이름과 종류를 먼저 선택해 주세요!','warn');return;}
+  const now=new Date();
+  logs.unshift({name,type,time:now.toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}),ts:now.getTime()});
+  if(logs.length>200)logs=logs.slice(0,200);
+  localStorage.setItem('pa_logs',JSON.stringify(logs));
+  const stu=students.find(s=>s.name===name);
+  if(stu){if(!stu.sent)stu.sent={};stu.sent[type]=(stu.sent[type]||0)+1;localStorage.setItem('pa_students',JSON.stringify(students));}
+  updateCounts(); toast('발송 이력이 기록됐어요!');
+}
+
+function clearCompose(){document.getElementById('c-name').value='';document.getElementById('c-type').value='';document.getElementById('extra-fields').innerHTML='';document.getElementById('c-preview').value='';}
+
+// ── 템플릿 편집 ────────────────────────────────────────
+function renderEditList(){
+  const el=document.getElementById('edit-list');
+  const baseHTML=Object.keys(BASE_TEMPLATES).map(k=>`
+    <button class="edit-item${currentEditKey===k?' selected':''}" onclick="selectEdit('${k}',false)">
+      <span>${k}</span>
+      ${customTpls[k]?'<span class="badge badge-edited">수정</span>':''}
+    </button>`).join('');
+  const userHTML=Object.keys(userTpls).length?
+    '<div style="padding:6px 10px;font-size:10px;color:var(--text-muted);background:var(--warm-gray);border-bottom:1px solid var(--border);font-weight:700;letter-spacing:.05em">직접 추가</div>'+
+    Object.keys(userTpls).map(k=>`
+      <button class="edit-item${currentEditKey===k?' selected':''}" onclick="selectEdit('${k}',true)">
+        <span>${k}</span><span class="badge badge-new">신규</span>
+      </button>`).join(''):'';
+  el.innerHTML=baseHTML+userHTML;
+}
+
+function selectEdit(key,isUser){
+  currentEditKey=key; isUserTpl=isUser;
+  document.getElementById('edit-label').textContent=key;
+  document.getElementById('edit-area').value=getTpl(key);
+  document.getElementById('btn-delete').style.display=isUser?'':'none';
+  document.getElementById('edit-preview-box').style.display='none';
+  renderEditList();
+}
+
+function hideEditPreview(){document.getElementById('edit-preview-box').style.display='none';}
+
+function saveTemplate(){
+  if(!currentEditKey){toast('먼저 안내문을 선택해 주세요!','warn');return;}
+  const val=document.getElementById('edit-area').value.trim();
+  if(!val){toast('내용을 입력해 주세요!','warn');return;}
+  isUserTpl ? (userTpls[currentEditKey]=val,localStorage.setItem('pa_user_tpls',JSON.stringify(userTpls)))
+            : (customTpls[currentEditKey]=val,localStorage.setItem('pa_tpls',JSON.stringify(customTpls)));
+  renderEditList(); populateSelect(); toast('저장됐어요! 안내문 작성에 바로 반영됩니다 ✓');
+}
+
+function resetTemplate(){
+  if(!currentEditKey)return;
+  if(isUserTpl){toast('직접 추가한 템플릿은 원본이 없어요. 삭제 버튼을 이용해 주세요.','warn');return;}
+  if(!confirm(`"${currentEditKey}"를 원본으로 되돌릴까요?`))return;
+  delete customTpls[currentEditKey];
+  localStorage.setItem('pa_tpls',JSON.stringify(customTpls));
+  document.getElementById('edit-area').value=BASE_TEMPLATES[currentEditKey];
+  renderEditList(); toast('원본으로 되돌렸어요!');
+}
+
+function deleteTemplate(){
+  if(!isUserTpl||!currentEditKey)return;
+  if(!confirm(`"${currentEditKey}" 템플릿을 삭제할까요?`))return;
+  delete userTpls[currentEditKey];
+  localStorage.setItem('pa_user_tpls',JSON.stringify(userTpls));
+  currentEditKey=null; isUserTpl=false;
+  document.getElementById('edit-label').textContent='안내문을 선택하거나 새로 추가해 주세요';
+  document.getElementById('edit-area').value='';
+  document.getElementById('btn-delete').style.display='none';
+  renderEditList(); populateSelect(); toast('삭제됐어요!');
+}
+
+function previewEdit(){
+  if(!currentEditKey)return;
+  const text=applyVars(document.getElementById('edit-area').value,SAMPLE);
+  document.getElementById('edit-preview-text').textContent=text;
+  document.getElementById('edit-preview-box').style.display='block';
+}
+
+function insertVar(v){
+  const ta=document.getElementById('edit-area');
+  const s=ta.selectionStart,e=ta.selectionEnd;
+  ta.value=ta.value.slice(0,s)+v+ta.value.slice(e);
+  ta.selectionStart=ta.selectionEnd=s+v.length;
+  ta.focus();
+}
+
+function openNewTpl(){ openModal('modal-new-tpl'); setTimeout(()=>document.getElementById('new-tpl-name').focus(),100); }
+function createNewTpl(){
+  const name=document.getElementById('new-tpl-name').value.trim();
+  if(!name){toast('이름을 입력해 주세요!','warn');return;}
+  if(BASE_TEMPLATES[name]||userTpls[name]){toast('이미 같은 이름의 템플릿이 있어요!','warn');return;}
+  userTpls[name]=''; localStorage.setItem('pa_user_tpls',JSON.stringify(userTpls));
+  closeModal('modal-new-tpl');
+  document.getElementById('new-tpl-name').value='';
+  renderEditList(); populateSelect(); selectEdit(name,true);
+  document.getElementById('edit-area').focus();
+  toast('새 템플릿이 만들어졌어요! 내용을 입력하고 저장해 주세요 ✏️');
+}
+
+// ── 발송 이력 ──────────────────────────────────────────
+function renderLog(){
+  const today=new Date().toDateString();
+  const month=new Date().getMonth();
+  document.getElementById('log-today').textContent=logs.filter(l=>new Date(l.ts||0).toDateString()===today).length;
+  document.getElementById('log-month').textContent=logs.filter(l=>new Date(l.ts||0).getMonth()===month).length;
+  const el=document.getElementById('log-list');
+  if(!logs.length){el.innerHTML='<div class="empty-state">아직 발송 기록이 없어요.<br>안내문을 작성하고 "발송 완료 기록" 버튼을 눌러주세요!</div>';return;}
+  el.innerHTML=logs.map(l=>`<div class="log-row">
+    <div class="log-dot"></div>
+    <div style="flex:1">
+      <div style="font-size:13px;font-weight:700">${l.name} 학생</div>
+      <div style="font-size:11px;color:var(--text-muted)">${l.type}</div>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);flex-shrink:0">${l.time}</div>
+  </div>`).join('');
+}
+
+function clearLog(){
+  if(!confirm('발송 이력을 모두 삭제할까요?'))return;
+  logs=[]; localStorage.removeItem('pa_logs'); updateCounts(); renderLog(); toast('이력이 초기화됐어요.');
+}
+
+// ── 월별 일정 ──────────────────────────────────────────
+function renderSchedule(){
+  const el=document.getElementById('schedule-content');
+  el.innerHTML=Object.entries(SCHEDULE_DATA).map(([sid,season])=>`
+    <div class="season-hdr">${season.label}</div>
+    ${season.items.map(item=>`
+      <div class="checklist-row">
+        <input type="checkbox" id="${item.id}" ${checks[item.id]?'checked':''} onchange="toggleCheck('${item.id}')">
+        <label for="${item.id}" class="checklist-label">${item.label}</label>
+        <span class="checklist-target">${item.target}</span>
+        <span class="badge ${checks[item.id]?'badge-done':'badge-pending'}" id="b${item.id}">${checks[item.id]?'완료':'예정'}</span>
+      </div>`).join('')}`).join('');
+}
+
+function toggleCheck(id){
+  checks[id]=!checks[id];
+  const b=document.getElementById('b'+id);
+  if(b){b.textContent=checks[id]?'완료':'예정';b.className='badge '+(checks[id]?'badge-done':'badge-pending');}
+}
+
+function saveChecks(){
+  localStorage.setItem('pa_checks',JSON.stringify(checks)); toast('체크리스트가 저장됐어요!');
+}
+
+// ── 초기화 ─────────────────────────────────────────────
+populateSelect();
+updateCounts();
+renderHome();
+</script>
+</body>
+</html>
