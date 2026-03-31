@@ -2530,10 +2530,17 @@ function handleAttendance(data) {
 
     var allData = sheet.getDataRange().getValues();
     var found = false;
+    var maxRow = allData.length;
+    var maxCol = allData[0] ? allData[0].length : 0;
 
-    // 아래에서 위로 검색하여 최신 연도 날짜를 먼저 찾기
-    for (var r = allData.length - 1; r >= 0 && !found; r--) {
-      for (var c = 0; c < allData[r].length; c++) {
+    for (var r = 0; r < maxRow && !found; r++) {
+      // 숨김 행 건너뛰기
+      if (sheet.isRowHiddenByUser(r + 1)) continue;
+
+      for (var c = 0; c < maxCol; c++) {
+        // 숨김 열 건너뛰기
+        if (sheet.isColumnHiddenByUser(c + 1)) continue;
+
         if (!matchDate(allData[r][c], tMonth, tDay, tz)) continue;
 
         debug.push(rec.name + ': MATCH R' + r + ' C' + c + ' val=' + String(allData[r][c]));
