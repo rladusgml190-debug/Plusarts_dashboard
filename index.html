@@ -779,6 +779,27 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.1rem 0;}
             <button class="btn btn-sm" onclick="document.getElementById('abs-notice-panel').style.display='none'">닫기</button>
           </div>
         </div>
+
+        <!-- 보강 지정 패널 -->
+        <div class="card" id="abs-makeup-assign-panel" style="display:none;margin-top:12px;">
+          <div class="card-title">보강 수업 지정 — <span id="abs-makeup-assign-name" style="color:var(--red);"></span></div>
+          <p style="font-size:12px;color:var(--mid);margin-bottom:1rem;">보강 수업 날짜와 시간을 지정하면 구글 시트에 자동으로 기록돼요.</p>
+          <div class="g2" style="margin-bottom:8px;">
+            <div class="form-row" style="margin:0;"><label>보강 날짜</label><input type="date" id="abs-makeup-assign-date"/></div>
+            <div class="form-row" style="margin:0;"><label>시간대</label>
+              <select id="abs-makeup-assign-slot">
+                <option value="11:00–14:00">오전 11:00 – 오후 2:00</option>
+                <option value="14:00–17:00">오후 2:00 – 5:00</option>
+                <option value="18:00–21:00">오후 6:00 – 9:00</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row"><label>담당 선생님</label><select id="abs-makeup-assign-teacher"></select></div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="saveAdminMakeupAssign()">💾 보강 지정 및 시트 기록</button>
+            <button class="btn btn-sm" onclick="document.getElementById('abs-makeup-assign-panel').style.display='none'">닫기</button>
+          </div>
+        </div>
       </div>
 
       <!-- 학생 관리 -->
@@ -2560,7 +2581,10 @@ function handleAttendance(data) {
             sheet.getRange(sr + 1, c + 1 + colOffset).setValue(rec.absLabel);
             debug.push('  ROUND R' + (sr+1) + ' C' + (c+1+colOffset) + ' = ' + rec.absLabel);
           }
-          if (found && lbl.indexOf('\\uD68C\\uCC28') > -1) break;
+          if (lbl.indexOf('\\uBE44\\uACE0') > -1 && rec.remark) {
+            sheet.getRange(sr + 1, c + 1 + colOffset).setValue(rec.remark);
+            debug.push('  REMARK R' + (sr+1) + ' C' + (c+1+colOffset) + ' = ' + rec.remark);
+          }
           if (found && lbl.indexOf('\\uBE44\\uACE0') > -1) break;
         }
         if (found) break;
@@ -3577,6 +3601,24 @@ async function saveAttendanceToSheet(date, slot){
   }
 }
 
+/* ── 결강 → 구글 시트 자동 기록 ── */
+async function syncAbsenceToSheet(studentName, absDate, absSlot, reason){
+  const url = localStorage.getItem(K_ATT_SHEET_URL);
+  if(!url) return;
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type':'text/plain'},
+      body: JSON.stringify({
+        action: 'attendance',
+        date: absDate,
+        slot: absSlot,
+        records: [{ name: studentName, status: '결강', teacher: '', absLabel: '', remark: reason }]
+      })
+    });
+  } catch(e){ console.warn('결강 시트 기록 실패:', e); }
+}
+
 /* ── 보강 예약 → 구글 시트 자동 기록 ── */
 async function syncMakeupToSheet(studentName, makeupDate, makeupSlot, teacher, absLabel){
   const url = localStorage.getItem(K_ATT_SHEET_URL);
@@ -3668,6 +3710,9 @@ function submitAbsence(){
     mkCard.scrollIntoView({behavior:'smooth', block:'nearest'});
   }
   toast('결강 신청 완료! 바로 아래에서 보강 수업을 예약할 수 있어요 😊');
+
+  // 구글 시트에 결강 기록
+  syncAbsenceToSheet(currentStudent.name, date, slot, reason);
 }
 
 /* ── student: render my absences ── */
@@ -4037,6 +4082,7 @@ function renderAdminAbsencePanel(){
       <td style="padding:10px 14px;text-align:center;">
         <div style="display:flex;gap:5px;justify-content:center;flex-wrap:wrap;">
           ${st==='pending'?`<button class="btn btn-sm btn-green2" onclick="confirmAbsenceAdmin('${a.portalId}','${a.id}')">✓</button>`:''}
+          ${!a.makeupSlotId?`<button class="btn btn-sm btn-amber" onclick="openAdminMakeupAssign('${a.portalId}','${a.id}','${a.studentName}','${a.date}')">보강 지정</button>`:''}
           <button class="btn btn-sm btn-blue2" onclick="openAbsNoticePanel('${a.portalId}','${a.id}','${a.studentName}')">안내</button>
           <button class="btn btn-sm btn-danger" onclick="deleteAbsAdmin('${a.portalId}','${a.id}')">삭제</button>
         </div>
@@ -4086,6 +4132,49 @@ function deleteAbsAdmin(portalId, absId){
   if(absences[portalId]) absences[portalId]=absences[portalId].filter(a=>a.id!==absId);
   svAbsences(absences);
   renderAdminAbsencePanel();
+}
+
+/* ── 관리자 보강 지정 ── */
+let adminMakeupTarget = {portalId:null, absId:null, studentName:'', absDate:''};
+
+function openAdminMakeupAssign(portalId, absId, studentName, absDate){
+  adminMakeupTarget = {portalId, absId, studentName, absDate};
+  document.getElementById('abs-makeup-assign-name').textContent = studentName;
+  // 선생님 목록 채우기
+  const teachers = ld(K.TEACHERS);
+  const sel = document.getElementById('abs-makeup-assign-teacher');
+  sel.innerHTML = '<option value="">선택</option>' + teachers.map(t=>`<option value="${t}">${t}</option>`).join('');
+  document.getElementById('abs-makeup-assign-panel').style.display='block';
+  document.getElementById('abs-makeup-assign-panel').scrollIntoView({behavior:'smooth'});
+}
+
+function saveAdminMakeupAssign(){
+  const {portalId, absId, studentName, absDate} = adminMakeupTarget;
+  if(!portalId||!absId) return;
+  const makeupDate = document.getElementById('abs-makeup-assign-date').value;
+  const makeupSlot = document.getElementById('abs-makeup-assign-slot').value;
+  const teacher = document.getElementById('abs-makeup-assign-teacher').value;
+  if(!makeupDate){ toast('보강 날짜를 선택해주세요.','warn'); return; }
+  if(!teacher){ toast('담당 선생님을 선택해주세요.','warn'); return; }
+
+  // 결강 데이터 업데이트
+  const absences = ldAbsences();
+  const item = (absences[portalId]||[]).find(a=>a.id===absId);
+  if(item){
+    item.status = 'confirmed';
+    item.makeupSlotId = 'admin_'+Date.now();
+    item.notice = makeupDate+' '+makeupSlot+' ('+teacher+')';
+    svAbsences(absences);
+  }
+
+  // 구글 시트에 보강예정 기록
+  const absParts = absDate.split('-');
+  const absLabel = absParts.length===3 ? (absParts[1]+absParts[2]+'결강분') : '';
+  syncMakeupToSheet(studentName, makeupDate, makeupSlot, teacher, absLabel);
+
+  document.getElementById('abs-makeup-assign-panel').style.display='none';
+  renderAdminAbsencePanel();
+  toast('보강이 지정됐어요! 구글 시트에도 기록 중...');
 }
 
 </script>
