@@ -1026,6 +1026,28 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.1rem 0;}
           </div>
         </div>
         <div class="card">
+          <div class="card-title">출결 기록 <span>구글 시트 연동</span></div>
+          <p style="font-size:12px;color:var(--mid);margin-bottom:1rem;">강사모드에서 출결을 기록하면 자동으로 구글 시트에 반영됩니다.</p>
+          <div class="form-row">
+            <label>출결 시트 Apps Script URL</label>
+            <input id="att-sheet-url-input" placeholder="https://script.google.com/macros/s/.../exec" style="font-size:12px;"/>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-red2" onclick="saveAttSheetUrl()">💾 URL 저장</button>
+          </div>
+          <div style="margin-top:14px;background:var(--gray);border-radius:5px;padding:12px;font-size:12px;color:var(--mid);line-height:1.8;">
+            <strong style="color:var(--black);display:block;margin-bottom:6px;">📌 출결 시트 Apps Script 설정 방법</strong>
+            1. 출결부 구글 시트 → <strong>확장프로그램 → Apps Script</strong><br/>
+            2. 아래 코드를 붙여넣고 저장<br/>
+            3. <strong>배포 → 새 배포</strong> → 유형: 웹 앱<br/>
+            4. 액세스: <strong>"모든 사용자"</strong> → 배포<br/>
+            5. URL을 위에 붙여넣기
+          </div>
+          <div style="margin-top:10px;">
+            <button class="btn btn-sm" onclick="copyAttAppsScript()">📋 출결 Apps Script 코드 복사</button>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-title">데이터 <span>동기화</span></div>
           <p style="font-size:12px;color:var(--mid);margin-bottom:1rem;">모든 데이터는 Firebase Firestore에 실시간으로 저장되어 여러 기기에서 동일하게 보여요. 🔥</p>
           <div class="btn-row">
@@ -1573,7 +1595,7 @@ function switchAdminTab(t){
   if(t==='absence') renderAdminAbsencePanel();
   if(t==='students') renderStudentAdmin();
   if(t==='timetable') renderTTAdminList();
-  if(t==='settings'){const u=getSheetsUrl();const el=document.getElementById('sheet-url-input');if(el&&u)el.value=u;updateSyncStatus();}
+  if(t==='settings'){const u=getSheetsUrl();const el=document.getElementById('sheet-url-input');if(el&&u)el.value=u;const au=localStorage.getItem(K_ATT_SHEET_URL)||'';const ael=document.getElementById('att-sheet-url-input');if(ael&&au)ael.value=au;updateSyncStatus();}
 }
 
 /* ── 비밀번호 변경 ── */
@@ -2412,6 +2434,106 @@ function copyAppsScript(){
   );
 }
 
+/* ── 출결 시트 연동 설정 ── */
+function saveAttSheetUrl(){
+  const url = document.getElementById('att-sheet-url-input').value.trim();
+  if(!url){ toast('URL을 입력해주세요.','warn'); return; }
+  localStorage.setItem(K_ATT_SHEET_URL, url);
+  toast('출결 시트 URL이 저장됐어요!');
+}
+
+const ATT_APPS_SCRIPT_CODE = `function doGet(e) {
+  return ContentService.createTextOutput(JSON.stringify({status:'ok'}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    if(data.action === 'attendance') {
+      return handleAttendance(data);
+    }
+    return ContentService.createTextOutput(JSON.stringify({success:false, error:'unknown action'}))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({success:false, error:err.toString()}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function handleAttendance(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var date = data.date;       // "2026-03-31"
+  var slot = data.slot;       // "11:00\\u201314:00"
+  var records = data.records; // [{name, status, date, slot}]
+
+  // 세션 매핑: 시간대 -> 열 오프셋
+  var slotMap = {
+    '11:00\\u201314:00': 0,   // 11am-2pm
+    '14:00\\u201317:00': 1,   // 2-5pm
+    '18:00\\u201321:00': 2    // 6-9pm
+  };
+
+  records.forEach(function(rec) {
+    var sheet = ss.getSheetByName(rec.name);
+    if(!sheet) return; // 해당 학생 탭이 없으면 건너뜀
+
+    // 시트에서 해당 날짜 찾기
+    var allData = sheet.getDataRange().getValues();
+    for(var r = 0; r < allData.length; r++) {
+      // "일자" 행에서 날짜 셀 찾기
+      for(var c = 0; c < allData[r].length; c++) {
+        var cell = allData[r][c];
+        if(!cell) continue;
+        var cellStr = '';
+        if(cell instanceof Date) {
+          var m = cell.getMonth()+1;
+          var d = cell.getDate();
+          cellStr = m + '월 ' + d + '일';
+        } else {
+          cellStr = String(cell);
+        }
+        // 날짜 매칭 (예: "3월 31일" vs "2026-03-31")
+        var parts = date.split('-');
+        var targetMonth = parseInt(parts[1]);
+        var targetDay = parseInt(parts[2]);
+        var target = targetMonth + '월 ' + targetDay + '일';
+
+        if(cellStr.indexOf(target) !== -1) {
+          // 이 열에서 세션[1] 행 찾기 (현재 열 기준)
+          // "출결" 행 찾기 - 보통 날짜 아래 4~5행
+          for(var sr = r+1; sr < Math.min(r+8, allData.length); sr++) {
+            var rowLabel = String(allData[sr][0] || '');
+            if(rowLabel === '출결') {
+              var colOffset = slotMap[slot] || 0;
+              sheet.getRange(sr+1, c+1+colOffset).setValue(rec.status);
+              break;
+            }
+          }
+          // 강사 행도 기록
+          for(var sr2 = r+1; sr2 < Math.min(r+8, allData.length); sr2++) {
+            var rowLabel2 = String(allData[sr2][0] || '');
+            if(rowLabel2 === '강사') {
+              // 강사 이름은 records 에서 가져올 수 없으므로 비워둠
+              break;
+            }
+          }
+          return; // 해당 학생 처리 완료
+        }
+      }
+    }
+  });
+
+  return ContentService.createTextOutput(JSON.stringify({success:true, count:records.length}))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+
+function copyAttAppsScript(){
+  navigator.clipboard.writeText(ATT_APPS_SCRIPT_CODE).then(()=>
+    toast('출결 Apps Script 코드가 복사됐어요! Google Apps Script에 붙여넣기 하세요.')
+  );
+}
+
 
 function showConflictPopup(slot){
   const tt = ld(K.TT);
@@ -2475,16 +2597,17 @@ let currentTeacherTab = 'today';
 
 function showTeacherTab(tab){
   currentTeacherTab = tab;
-  ['today','week'].forEach(t=>{
+  ['today','week','attendance'].forEach(t=>{
     document.getElementById('tsec-'+t).style.display = t===tab ? 'block':'none';
     const btn = document.getElementById('tnav-'+t);
     if(btn) btn.classList.toggle('active', t===tab);
   });
-  const titles = {today:'오늘 수업', week:'주간 일정'};
+  const titles = {today:'오늘 수업', week:'주간 일정', attendance:'출결 기록'};
   document.getElementById('teacherHeroTitle').innerHTML =
-    titles[tab].replace(/수업|일정/, m=>`<span style="color:var(--red);">${m}</span>`);
+    titles[tab].replace(/수업|일정|기록/, m=>`<span style="color:var(--red);">${m}</span>`);
   if(tab==='today') renderTeacherToday();
   if(tab==='week')  renderTeacherWeek();
+  if(tab==='attendance') initAttendanceTab();
   startTeacherAutoRefresh();
 }
 
@@ -3073,6 +3196,197 @@ function getFilteredStudents(q=''){
 })();
 
 /* ═══════════════════════════════════════════════
+   ATTENDANCE (출결) SYSTEM
+═══════════════════════════════════════════════ */
+const K_ATTENDANCE = 'pa_attendance_v1'; // {date_slot: {studentId: status}}
+const K_ATT_SHEET_URL = 'pa_att_sheet_url';
+const ATT_STATUS_LIST = [
+  {value:'출강', label:'출강', color:'var(--ok-txt)', bg:'var(--ok-bg)'},
+  {value:'보강완료', label:'보강완료', color:'#1976D2', bg:'#E3F2FD'},
+  {value:'보강예정', label:'보강예정', color:'var(--warn-txt)', bg:'var(--warn-bg)'},
+  {value:'당일결강', label:'당일결강', color:'var(--err-txt)', bg:'var(--err-bg)'},
+  {value:'정기휴원', label:'정기휴원', color:'var(--mid)', bg:'var(--gray)'},
+  {value:'보강결강', label:'보강결강', color:'#880E4F', bg:'#FCE4EC'}
+];
+
+function ldAttendance(){ try{ return JSON.parse(localStorage.getItem(K_ATTENDANCE))||{}; }catch{ return {}; } }
+function svAttendance(v){ localStorage.setItem(K_ATTENDANCE,JSON.stringify(v)); if(window.fbSave) window.fbSave(K_ATTENDANCE,v); }
+
+function initAttendanceTab(){
+  const dateEl = document.getElementById('att-date');
+  if(!dateEl.value) dateEl.value = getTodayStr();
+  renderAttendanceForm();
+  renderAttendanceHistory();
+}
+
+function renderAttendanceForm(){
+  const date = document.getElementById('att-date').value;
+  const slot = document.getElementById('att-slot').value;
+  const content = document.getElementById('att-form-content');
+  const empty = document.getElementById('att-form-empty');
+
+  if(!date || !slot){ content.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+
+  const dateObj = new Date(date+'T12:00:00');
+  const dayNames=['일','월','화','수','목','금','토'];
+  const day = dayNames[dateObj.getDay()];
+
+  // 정규 수업 학생
+  const tt = ld(K.TT);
+  const portalStudents = ld(K.STUDENTS);
+  const ttEntries = tt.filter(e => e.day===day && e.slot===slot);
+  const regularStudents = [];
+  ttEntries.forEach(entry => {
+    portalStudents.forEach(s => {
+      if((s.myTT||[]).includes(entry.id)){
+        regularStudents.push({id:s.id, name:s.name, className:entry.name, teacher:entry.teacher, type:'정규'});
+      }
+    });
+  });
+
+  // 보강 수업 학생
+  const slots = ld(K.SLOTS);
+  const makeupSlots = slots.filter(s => s.date===date && s.time===slot && s.active);
+  const makeupStudents = [];
+  makeupSlots.forEach(s => {
+    (s.reservations||[]).forEach(r => {
+      makeupStudents.push({id:r.studentId, name:r.name, teacher:s.teacher, type:'보강'});
+    });
+  });
+
+  const allStudents = [...regularStudents, ...makeupStudents];
+  if(!allStudents.length){
+    content.innerHTML='<div class="empty-state">이 날짜/시간대에 수업이 없거나 등록된 학생이 없어요.</div>';
+    return;
+  }
+
+  // 저장된 출결 데이터 불러오기
+  const attData = ldAttendance();
+  const key = date+'_'+slot;
+  const saved = attData[key] || {};
+
+  let html = `<div style="font-size:12px;color:var(--mid);margin-bottom:10px;">${date} (${day}) ${slot} · 총 ${allStudents.length}명</div>`;
+  html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
+  allStudents.forEach(s => {
+    const curStatus = saved[s.id] || '';
+    const typeBadge = s.type==='보강'
+      ? '<span style="font-size:10px;background:#FFF3E0;color:#B45309;border-radius:3px;padding:1px 6px;margin-left:6px;">보강</span>'
+      : '<span style="font-size:10px;background:#EAF7ED;color:#1D7A36;border-radius:3px;padding:1px 6px;margin-left:6px;">정규</span>';
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--gray);border:1px solid var(--border);border-radius:6px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:120px;">
+        <span style="font-weight:700;font-size:14px;">${s.name}</span>${typeBadge}
+        <div style="font-size:11px;color:var(--mid);margin-top:2px;">${s.className?s.className+' · ':''}담당: ${s.teacher}</div>
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;">
+        ${ATT_STATUS_LIST.map(st =>
+          `<button class="btn btn-sm" style="padding:4px 10px;font-size:11px;${curStatus===st.value?'background:'+st.bg+';color:'+st.color+';border-color:'+st.color+';font-weight:700;':''}" onclick="setAttStatus('${date}','${slot}','${s.id}','${st.value}')">${st.label}</button>`
+        ).join('')}
+        ${curStatus?`<button class="btn btn-sm" style="padding:4px 8px;font-size:11px;color:var(--mid);" onclick="setAttStatus('${date}','${slot}','${s.id}','')">✕</button>`:''}
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+  html += `<div style="margin-top:12px;display:flex;gap:8px;">
+    <button class="btn btn-primary" onclick="saveAttendanceToSheet('${date}','${slot}')">📤 구글 시트에 저장</button>
+  </div>`;
+  content.innerHTML = html;
+}
+
+function setAttStatus(date, slot, studentId, status){
+  const attData = ldAttendance();
+  const key = date+'_'+slot;
+  if(!attData[key]) attData[key] = {};
+  if(status) attData[key][studentId] = status;
+  else delete attData[key][studentId];
+  svAttendance(attData);
+  renderAttendanceForm();
+  renderAttendanceHistory();
+}
+
+function renderAttendanceHistory(){
+  const attData = ldAttendance();
+  const el = document.getElementById('att-history');
+  const em = document.getElementById('att-history-empty');
+  const keys = Object.keys(attData).sort().reverse().slice(0, 20);
+  if(!keys.length){ el.innerHTML=''; em.style.display='block'; return; }
+  em.style.display='none';
+  const portalStudents = ld(K.STUDENTS);
+  const dayNames=['일','월','화','수','목','금','토'];
+
+  let html = '';
+  keys.forEach(key => {
+    const [date, ...slotParts] = key.split('_');
+    const slot = slotParts.join('_');
+    const dayName = dayNames[new Date(date+'T12:00:00').getDay()];
+    const records = attData[key];
+    const entries = Object.entries(records);
+    if(!entries.length) return;
+    const statusCount = {};
+    entries.forEach(([sid, st]) => { statusCount[st] = (statusCount[st]||0)+1; });
+    const summary = Object.entries(statusCount).map(([st, cnt]) => {
+      const info = ATT_STATUS_LIST.find(s=>s.value===st);
+      return `<span style="color:${info?info.color:'var(--mid)'};font-weight:600;">${st} ${cnt}명</span>`;
+    }).join(' · ');
+
+    html += `<div style="padding:10px 0;border-bottom:1px solid var(--border);">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <span style="font-weight:700;font-size:13px;">${date} (${dayName})</span>
+          <span style="font-size:12px;color:var(--mid);margin-left:8px;">${slot}</span>
+        </div>
+        <span style="font-size:11px;">${summary}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">
+        ${entries.map(([sid, st]) => {
+          const stu = portalStudents.find(p=>p.id===sid);
+          const info = ATT_STATUS_LIST.find(s=>s.value===st);
+          return `<span style="font-size:11px;padding:2px 8px;border-radius:3px;background:${info?info.bg:'var(--gray)'};color:${info?info.color:'var(--mid)'};">${stu?stu.name:sid}: ${st}</span>`;
+        }).join('')}
+      </div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+/* ── 구글 시트 출결 연동 ── */
+async function saveAttendanceToSheet(date, slot){
+  const url = localStorage.getItem(K_ATT_SHEET_URL);
+  if(!url){
+    toast('관리자 설정에서 출결 시트 Apps Script URL을 먼저 등록해주세요.','warn');
+    return;
+  }
+  const attData = ldAttendance();
+  const key = date+'_'+slot;
+  const records = attData[key];
+  if(!records || !Object.keys(records).length){
+    toast('기록된 출결 데이터가 없어요.','warn');
+    return;
+  }
+  const portalStudents = ld(K.STUDENTS);
+  const entries = Object.entries(records).map(([sid, status]) => {
+    const stu = portalStudents.find(p=>p.id===sid);
+    return { name: stu?stu.name:'알 수 없음', status, date, slot };
+  });
+
+  try {
+    toast('구글 시트에 저장 중...');
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type':'text/plain'},
+      body: JSON.stringify({ action:'attendance', date, slot, records: entries })
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const result = await res.json();
+    if(result.success) toast('구글 시트에 출결이 저장됐어요! ✅');
+    else toast('저장 실패: '+(result.error||'알 수 없는 오류'),'warn');
+  } catch(e){
+    console.error('Sheet save error:', e);
+    toast('구글 시트 연결 실패. URL을 확인해주세요.','warn');
+  }
+}
+
+/* ═══════════════════════════════════════════════
    ABSENCE (결강) SYSTEM
 ═══════════════════════════════════════════════ */
 const K_ABSENCE = 'pa_absences_v1'; // {stuId: [{id,date,slot,reason,status,notice,ts}]}
@@ -3565,6 +3879,7 @@ function deleteAbsAdmin(portalId, absId){
         <nav>
           <button class="nb active" id="tnav-today" onclick="showTeacherTab('today')">오늘 수업</button>
           <button class="nb" id="tnav-week" onclick="showTeacherTab('week')">주간 일정</button>
+          <button class="nb" id="tnav-attendance" onclick="showTeacherTab('attendance')">출결 기록</button>
           <button class="nb logout" onclick="teacherLogout()">← 나가기</button>
         </nav>
       </div>
@@ -3602,6 +3917,30 @@ function deleteAbsAdmin(portalId, absId){
       </div>
       <div id="tsec-week" style="display:none;">
         <div id="teacherWeekContent"></div>
+      </div>
+      <!-- 출결 기록 -->
+      <div id="tsec-attendance" style="display:none;">
+        <div class="card">
+          <div class="card-title">출결 <span>기록</span></div>
+          <div class="g2" style="margin-bottom:10px;">
+            <div class="form-row" style="margin:0;"><label>날짜</label><input type="date" id="att-date" onchange="renderAttendanceForm()"/></div>
+            <div class="form-row" style="margin:0;"><label>시간대</label>
+              <select id="att-slot" onchange="renderAttendanceForm()">
+                <option value="">선택</option>
+                <option value="11:00–14:00">오전 11:00 – 오후 2:00</option>
+                <option value="14:00–17:00">오후 2:00 – 5:00</option>
+                <option value="18:00–21:00">오후 6:00 – 9:00</option>
+              </select>
+            </div>
+          </div>
+          <div id="att-form-content"></div>
+          <div id="att-form-empty" class="empty-state" style="display:none;">날짜와 시간대를 선택하면 해당 수업의 학생 목록이 표시돼요.</div>
+        </div>
+        <div class="card">
+          <div class="card-title">최근 출결 <span>기록</span></div>
+          <div id="att-history"></div>
+          <div id="att-history-empty" class="empty-state" style="display:none;">저장된 출결 기록이 없어요.</div>
+        </div>
       </div>
     </main>
   </div>
