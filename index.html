@@ -687,6 +687,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.1rem 0;}
         <button class="sub-tab" id="atab-notices" onclick="switchAdminTab('notices')">안내문</button>
         <button class="sub-tab" id="atab-absence" onclick="switchAdminTab('absence')">🚫 결강 관리</button>
         <button class="sub-tab" id="atab-makeup" onclick="switchAdminTab('makeup')">보강수업</button>
+        <button class="sub-tab" id="atab-attendance" onclick="switchAdminTab('attendance')">📋 출결 기록</button>
         <button class="sub-tab" id="atab-timetable" onclick="switchAdminTab('timetable')">정규 시간표</button>
         <button class="sub-tab" id="atab-teachers" onclick="switchAdminTab('teachers')">선생님</button>
         <button class="sub-tab" id="atab-settings" onclick="switchAdminTab('settings')">설정</button>
@@ -925,6 +926,31 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.1rem 0;}
           <div id="reservationList"></div>
           <hr class="div"/>
           <button class="btn btn-sm" onclick="document.getElementById('reservationPanel').style.display='none'">닫기</button>
+        </div>
+      </div>
+
+      <!-- 출결 기록 (관리자) -->
+      <div id="apanel-attendance" style="display:none;">
+        <div class="card">
+          <div class="card-title">출결 <span>기록</span></div>
+          <div class="g2" style="margin-bottom:10px;">
+            <div class="form-row" style="margin:0;"><label>날짜</label><input type="date" id="admin-att-date" onchange="renderAdminAttendanceForm()"/></div>
+            <div class="form-row" style="margin:0;"><label>시간대</label>
+              <select id="admin-att-slot" onchange="renderAdminAttendanceForm()">
+                <option value="">선택</option>
+                <option value="11:00–14:00">오전 11:00 – 오후 2:00</option>
+                <option value="14:00–17:00">오후 2:00 – 5:00</option>
+                <option value="18:00–21:00">오후 6:00 – 9:00</option>
+              </select>
+            </div>
+          </div>
+          <div id="admin-att-form-content"></div>
+          <div id="admin-att-form-empty" class="empty-state" style="display:none;">날짜와 시간대를 선택하면 해당 수업의 학생 목록이 표시돼요.</div>
+        </div>
+        <div class="card">
+          <div class="card-title">최근 출결 <span>기록</span></div>
+          <div id="admin-att-history"></div>
+          <div id="admin-att-history-empty" class="empty-state" style="display:none;">저장된 출결 기록이 없어요.</div>
         </div>
       </div>
 
@@ -1587,7 +1613,7 @@ function doAdminLogout(){document.getElementById('adminPanel').style.display='no
 function adminBackToLogin(){hidePage('adminPage');showPage('loginPage');}
 
 function switchAdminTab(t){
-  ['notices2','students','notices','absence','makeup','timetable','teachers','settings'].forEach(x=>{
+  ['notices2','students','notices','absence','makeup','attendance','timetable','teachers','settings'].forEach(x=>{
     document.getElementById('apanel-'+x).style.display=x===t?'block':'none';
     document.getElementById('atab-'+x).classList.toggle('active',x===t);
   });
@@ -1595,6 +1621,7 @@ function switchAdminTab(t){
   if(t==='absence') renderAdminAbsencePanel();
   if(t==='students') renderStudentAdmin();
   if(t==='timetable') renderTTAdminList();
+  if(t==='attendance') initAdminAttendanceTab();
   if(t==='settings'){const u=getSheetsUrl();const el=document.getElementById('sheet-url-input');if(el&&u)el.value=u;const au=localStorage.getItem(K_ATT_SHEET_URL)||'';const ael=document.getElementById('att-sheet-url-input');if(ael&&au)ael.value=au;updateSyncStatus();}
 }
 
@@ -3215,6 +3242,142 @@ function initAttendanceTab(){
   if(!dateEl.value) dateEl.value = getTodayStr();
   renderAttendanceForm();
   renderAttendanceHistory();
+}
+
+function initAdminAttendanceTab(){
+  const dateEl = document.getElementById('admin-att-date');
+  if(!dateEl.value) dateEl.value = getTodayStr();
+  renderAdminAttendanceForm();
+  renderAdminAttendanceHistory();
+}
+
+function renderAdminAttendanceForm(){
+  const date = document.getElementById('admin-att-date').value;
+  const slot = document.getElementById('admin-att-slot').value;
+  const content = document.getElementById('admin-att-form-content');
+  const empty = document.getElementById('admin-att-form-empty');
+
+  if(!date || !slot){ content.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+
+  const dateObj = new Date(date+'T12:00:00');
+  const dayNames=['일','월','화','수','목','금','토'];
+  const day = dayNames[dateObj.getDay()];
+
+  const tt = ld(K.TT);
+  const portalStudents = ld(K.STUDENTS);
+  const ttEntries = tt.filter(e => e.day===day && e.slot===slot);
+  const regularStudents = [];
+  ttEntries.forEach(entry => {
+    portalStudents.forEach(s => {
+      if((s.myTT||[]).includes(entry.id)){
+        regularStudents.push({id:s.id, name:s.name, className:entry.name, teacher:entry.teacher, type:'정규'});
+      }
+    });
+  });
+
+  const slots = ld(K.SLOTS);
+  const makeupSlots = slots.filter(s => s.date===date && s.time===slot && s.active);
+  const makeupStudents = [];
+  makeupSlots.forEach(s => {
+    (s.reservations||[]).forEach(r => {
+      makeupStudents.push({id:r.studentId, name:r.name, teacher:s.teacher, type:'보강'});
+    });
+  });
+
+  const allStudents = [...regularStudents, ...makeupStudents];
+  if(!allStudents.length){
+    content.innerHTML='<div class="empty-state">이 날짜/시간대에 수업이 없거나 등록된 학생이 없어요.</div>';
+    return;
+  }
+
+  const attData = ldAttendance();
+  const key = date+'_'+slot;
+  const rawSaved = attData[key] || {};
+  const saved = {};
+  Object.entries(rawSaved).forEach(([sid, v]) => { saved[sid] = typeof v === 'string' ? v : (v.status||''); });
+
+  let html = `<div style="font-size:12px;color:var(--mid);margin-bottom:10px;">${date} (${day}) ${slot} · 총 ${allStudents.length}명</div>`;
+  html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
+  allStudents.forEach(s => {
+    const curStatus = saved[s.id] || '';
+    const typeBadge = s.type==='보강'
+      ? '<span style="font-size:10px;background:#FFF3E0;color:#B45309;border-radius:3px;padding:1px 6px;margin-left:6px;">보강</span>'
+      : '<span style="font-size:10px;background:#EAF7ED;color:#1D7A36;border-radius:3px;padding:1px 6px;margin-left:6px;">정규</span>';
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--gray);border:1px solid var(--border);border-radius:6px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:120px;">
+        <span style="font-weight:700;font-size:14px;">${s.name}</span>${typeBadge}
+        <div style="font-size:11px;color:var(--mid);margin-top:2px;">${s.className?s.className+' · ':''}담당: ${s.teacher}</div>
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;">
+        ${ATT_STATUS_LIST.map(st =>
+          `<button class="btn btn-sm" style="padding:4px 10px;font-size:11px;${curStatus===st.value?'background:'+st.bg+';color:'+st.color+';border-color:'+st.color+';font-weight:700;':''}" onclick="setAdminAttStatus('${date}','${slot}','${s.id}','${st.value}','${(s.teacher||'').replace(/'/g,"\\'")}')">${st.label}</button>`
+        ).join('')}
+        ${curStatus?`<button class="btn btn-sm" style="padding:4px 8px;font-size:11px;color:var(--mid);" onclick="setAdminAttStatus('${date}','${slot}','${s.id}','','')">✕</button>`:''}
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+  html += `<div style="margin-top:12px;display:flex;gap:8px;">
+    <button class="btn btn-primary" onclick="saveAttendanceToSheet('${date}','${slot}')">📤 구글 시트에 저장</button>
+  </div>`;
+  content.innerHTML = html;
+}
+
+function setAdminAttStatus(date, slot, studentId, status, teacher){
+  const attData = ldAttendance();
+  const key = date+'_'+slot;
+  if(!attData[key]) attData[key] = {};
+  if(status) attData[key][studentId] = {status, teacher: teacher||''};
+  else delete attData[key][studentId];
+  svAttendance(attData);
+  renderAdminAttendanceForm();
+  renderAdminAttendanceHistory();
+}
+
+function renderAdminAttendanceHistory(){
+  const attData = ldAttendance();
+  const el = document.getElementById('admin-att-history');
+  const em = document.getElementById('admin-att-history-empty');
+  const keys = Object.keys(attData).sort().reverse().slice(0, 30);
+  if(!keys.length){ el.innerHTML=''; em.style.display='block'; return; }
+  em.style.display='none';
+  const portalStudents = ld(K.STUDENTS);
+  const dayNames=['일','월','화','수','목','금','토'];
+
+  let html = '';
+  keys.forEach(key => {
+    const [date, ...slotParts] = key.split('_');
+    const slot = slotParts.join('_');
+    const dayName = dayNames[new Date(date+'T12:00:00').getDay()];
+    const records = attData[key];
+    const entries = Object.entries(records).map(([sid, v]) => [sid, typeof v === 'string' ? v : (v.status||'')]);
+    if(!entries.length) return;
+    const statusCount = {};
+    entries.forEach(([sid, st]) => { statusCount[st] = (statusCount[st]||0)+1; });
+    const summary = Object.entries(statusCount).map(([st, cnt]) => {
+      const info = ATT_STATUS_LIST.find(s=>s.value===st);
+      return `<span style="color:${info?info.color:'var(--mid)'};font-weight:600;">${st} ${cnt}명</span>`;
+    }).join(' · ');
+
+    html += `<div style="padding:10px 0;border-bottom:1px solid var(--border);">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <span style="font-weight:700;font-size:13px;">${date} (${dayName})</span>
+          <span style="font-size:12px;color:var(--mid);margin-left:8px;">${slot}</span>
+        </div>
+        <span style="font-size:11px;">${summary}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">
+        ${entries.map(([sid, st]) => {
+          const stu = portalStudents.find(p=>p.id===sid);
+          const info = ATT_STATUS_LIST.find(s=>s.value===st);
+          return `<span style="font-size:11px;padding:2px 8px;border-radius:3px;background:${info?info.bg:'var(--gray)'};color:${info?info.color:'var(--mid)'};">${stu?stu.name:sid}: ${st}</span>`;
+        }).join('')}
+      </div>
+    </div>`;
+  });
+  el.innerHTML = html;
 }
 
 function renderAttendanceForm(){
