@@ -1629,16 +1629,13 @@ function renderStudentAdmin(q=''){
     const sent=s.sent||{}, sentCnt=Object.keys(sent).length, pct=Math.round(sentCnt/Math.max(keys.length,1)*100);
     const isOpen=openStudentId===s.id;
     // find matching portal student
-    const portal=portalStudents.find(p=>p.name===s.name);
-    const slots=ld(K.SLOTS);
-    const bookings=portal?slots.filter(sl=>(sl.reservations||[]).some(r=>r.studentId===portal.id)):[];
     const noticeLogs=logs.filter(l=>l.name===s.name);
     return `<div class="stu-card${isOpen?' open':''}">
       <div class="stu-hdr" onclick="toggleStu('${s.id}')">
         <div class="stu-avatar">${s.name.slice(0,2)}</div>
         <div style="flex:1;">
           <div class="stu-name">${s.name}</div>
-          <div class="stu-meta">${s.info||'수업 정보 없음'} · 안내문 ${sentCnt}/${keys.length}건 · 보강 ${bookings.length}회</div>
+          <div class="stu-meta">${s.info||'수업 정보 없음'} · 안내문 ${sentCnt}/${keys.length}건</div>
         </div>
         <div class="progress-wrap">
           <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
@@ -1653,7 +1650,7 @@ function renderStudentAdmin(q=''){
           <button class="stu-log-tab" id="sltab-notice-${s.id}" onclick="switchStuTab('${s.id}','notice')">✉️ 안내문</button>
           <button class="stu-log-tab" id="sltab-timetable-${s.id}" onclick="switchStuTab('${s.id}','timetable')">🗓 시간표</button>
 
-          <button class="stu-log-tab" id="sltab-booking-${s.id}" onclick="switchStuTab('${s.id}','booking')">📅 보강 예약</button>
+          <!-- 보강 예약은 결강관리 탭에서 통합 관리 -->
         </div>
         <!-- 기초 상담지 -->
         <div id="slpanel-intake-${s.id}">
@@ -1685,17 +1682,14 @@ function renderStudentAdmin(q=''){
           ${renderStuAdminTimetable(s.id)}
         </div>
 
-        <!-- 보강 예약 로그 -->
-        <div id="slpanel-booking-${s.id}" style="display:none;">
-          ${bookings.length?bookings.map(b=>`<div class="log-row"><div class="log-dot booking"></div><div style="flex:1;"><div style="font-size:13px;font-weight:700;">보강 예약</div><div style="font-size:11px;color:var(--mid);">${b.date} (${b.day}) ${b.time} · 담당: ${b.teacher}</div></div></div>`).join(''):'<div class="empty-state" style="padding:1.5rem 0;">보강 예약 기록이 없어요.</div>'}
-        </div>
+        <!-- 보강 예약은 결강관리 탭에서 통합 관리 -->
       </div>
     </div>`;
   }).join('');
 }
 
 function switchStuTab(stuId, tab){
-  ['intake','counsel','timetable','notice','booking'].forEach(t=>{
+  ['intake','counsel','timetable','notice'].forEach(t=>{
     const panel=document.getElementById(`slpanel-${t}-${stuId}`);
     const btn=document.getElementById(`sltab-${t}-${stuId}`);
     if(panel) panel.style.display=t===tab?'block':'none';
