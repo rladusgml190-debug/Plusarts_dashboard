@@ -2470,40 +2470,36 @@ function saveAttSheetUrl(){
 }
 
 const ATT_APPS_SCRIPT_CODE = `function doGet(e) {
-  return ContentService.createTextOutput(JSON.stringify({status:'ok'}))
-    .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({status:'ok'})).setMimeType(ContentService.MimeType.JSON);
 }
 
 function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
-    if(data.action === 'attendance') {
-      return handleAttendance(data);
-    }
-    return ContentService.createTextOutput(JSON.stringify({success:false, error:'unknown action'}))
-      .setMimeType(ContentService.MimeType.JSON);
+    if (data.action === 'attendance') return handleAttendance(data);
+    return ContentService.createTextOutput(JSON.stringify({success:false, error:'unknown action'})).setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
-    return ContentService.createTextOutput(JSON.stringify({success:false, error:err.toString()}))
-      .setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({success:false, error:err.toString()})).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
-function cellToDateText(cell) {
-  if (!cell) return '';
+function matchDate(cell, tMonth, tDay) {
+  if (!cell) return false;
   if (cell instanceof Date) {
-    var m = cell.getMonth() + 1;
-    var d = cell.getDate();
-    return m + '\\uC6D4 ' + d + '\\uC77C';
+    return (cell.getMonth() + 1) === tMonth && cell.getDate() === tDay;
   }
-  return String(cell).trim();
+  var s = String(cell);
+  var m = s.match(/(\\d+)\\s*\\u{C6D4}\\s*(\\d+)\\s*\\u{C77C}/u);
+  if (!m) m = s.match(/(\\d+)\\uc6d4\\s*(\\d+)\\uc77c/);
+  if (m) return parseInt(m[1]) === tMonth && parseInt(m[2]) === tDay;
+  return false;
 }
 
 function handleAttendance(data) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var dateParts = data.date.split('-');
-  var targetMonth = parseInt(dateParts[1]);
-  var targetDay = parseInt(dateParts[2]);
-  var target = targetMonth + '\\uC6D4 ' + targetDay + '\\uC77C';
+  var p = data.date.split('-');
+  var tMonth = parseInt(p[1]);
+  var tDay = parseInt(p[2]);
   var slot = data.slot || '';
   var records = data.records;
 
@@ -2515,45 +2511,40 @@ function handleAttendance(data) {
 
   records.forEach(function(rec) {
     var sheet = ss.getSheetByName(rec.name);
-    if (!sheet) { debug.push(rec.name + ': sheet not found'); return; }
+    if (!sheet) { debug.push(rec.name + ': NO SHEET'); return; }
 
     var allData = sheet.getDataRange().getValues();
     var found = false;
-    var dateCol = -1;
-    var dateRow = -1;
 
-    // Step 1: 모든 셀에서 목표 날짜 찾기
     for (var r = 0; r < allData.length && !found; r++) {
       for (var c = 0; c < allData[r].length; c++) {
-        var ct = cellToDateText(allData[r][c]);
-        if (ct === target) {
-          dateCol = c;
-          dateRow = r;
-          debug.push(rec.name + ': found ' + target + ' at R' + r + 'C' + c);
+        if (!matchDate(allData[r][c], tMonth, tDay)) continue;
 
-          // Step 2: 이 위치에서 아래로 강사/출결 행 찾기
-          for (var sr = r + 1; sr < Math.min(r + 10, allData.length); sr++) {
-            var label = String(allData[sr][0] || '').trim();
-            if (label.indexOf('\\uAC15\\uC0AC') !== -1 && rec.teacher) {
-              sheet.getRange(sr + 1, c + 1 + colOffset).setValue(rec.teacher);
-              debug.push('  teacher at R' + (sr+1) + 'C' + (c+1+colOffset));
-            }
-            if (label.indexOf('\\uCD9C\\uACB0') !== -1) {
-              sheet.getRange(sr + 1, c + 1 + colOffset).setValue(rec.status);
-              debug.push('  status at R' + (sr+1) + 'C' + (c+1+colOffset) + '=' + rec.status);
-              found = true;
-              break;
-            }
+        debug.push(rec.name + ': MATCH R' + r + ' C' + c + ' val=' + String(allData[r][c]));
+
+        for (var sr = r + 1; sr < Math.min(r + 10, allData.length); sr++) {
+          var lbl = String(allData[sr][0] || '');
+          if (lbl.indexOf('\\uAC15\\uC0AC') > -1 && rec.teacher) {
+            sheet.getRange(sr + 1, c + 1 + colOffset).setValue(rec.teacher);
+            debug.push('  TEACHER R' + (sr+1) + ' C' + (c+1+colOffset));
           }
-          if (found) break;
+          if (lbl.indexOf('\\uCD9C\\uACB0') > -1) {
+            sheet.getRange(sr + 1, c + 1 + colOffset).setValue(rec.status);
+            debug.push('  STATUS R' + (sr+1) + ' C' + (c+1+colOffset) + ' = ' + rec.status);
+            found = true;
+            break;
+          }
         }
+        if (found) break;
       }
     }
-    if (!found) debug.push(rec.name + ': ' + target + ' not found in sheet');
+    if (!found) {
+      var sheetNames = ss.getSheets().map(function(s){return s.getName();});
+      debug.push(rec.name + ': NOT FOUND (month=' + tMonth + ' day=' + tDay + ') sheets=' + sheetNames.join(','));
+    }
   });
 
-  return ContentService.createTextOutput(JSON.stringify({success:true, count:records.length, debug:debug}))
-    .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({success:true, count:records.length, debug:debug})).setMimeType(ContentService.MimeType.JSON);
 }`;
 
 function copyAttAppsScript(){
@@ -3547,8 +3538,10 @@ async function saveAttendanceToSheet(date, slot){
     if(!res.ok) throw new Error('HTTP '+res.status);
     const result = await res.json();
     if(result.success){
-      console.log('출결 저장 결과:', result.debug);
-      toast('구글 시트에 출결이 저장됐어요! ✅');
+      const dbg = result.debug||[];
+      console.log('출결 저장 디버그:', dbg);
+      if(dbg.some(d=>d.includes('NOT FOUND')||d.includes('NO SHEET'))) alert('출결 저장 문제 발견:\n\n'+dbg.join('\n'));
+      else toast('구글 시트에 출결이 저장됐어요! ✅');
     } else toast('저장 실패: '+(result.error||'알 수 없는 오류'),'warn');
   } catch(e){
     console.error('Sheet save error:', e);
