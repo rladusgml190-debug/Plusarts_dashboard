@@ -532,10 +532,9 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.1rem 0;}
     <!-- 대시보드 -->
     <div class="section visible" id="sec-dashboard">
       <div class="stat-grid">
-        <div class="stat-box"><div class="stat-num" id="stat-total">0</div><div class="stat-lbl">총 보강 예약</div></div>
-        <div class="stat-box"><div class="stat-num red" id="stat-upcoming">0</div><div class="stat-lbl">예정된 수업</div></div>
-        <div class="stat-box"><div class="stat-num red" id="stat-unbooked-abs">0</div><div class="stat-lbl">잔여 보강</div></div>
         <div class="stat-box"><div class="stat-num" id="stat-classes">0</div><div class="stat-lbl">내 정규 수업</div></div>
+        <div class="stat-box"><div class="stat-num red" id="stat-abs-count">0</div><div class="stat-lbl">내 결강 횟수</div></div>
+        <div class="stat-box"><div class="stat-num" id="stat-makeup-count">0</div><div class="stat-lbl">내 보강 수업</div></div>
       </div>
       <div class="card">
         <div class="card-title">예정된 <span>보강수업</span></div>
@@ -1452,11 +1451,11 @@ function renderDashboard(){
   const tt=ld(K.TT);
   const myTT=tt.filter(e=>(currentStudent.myTT||[]).includes(e.id));
   const absences=ldAbsences();
-  const myAbs=(absences[currentStudent.id]||[]).filter(a=>a.status!=='cancelled'&&!a.makeupSlotId);
-  document.getElementById('stat-total').textContent=myB.length;
-  document.getElementById('stat-upcoming').textContent=upcoming.length;
-  document.getElementById('stat-unbooked-abs').textContent=myAbs.length;
+  const myAbsAll=(absences[currentStudent.id]||[]).filter(a=>a.status!=='cancelled');
+  const myAbsUnbooked=myAbsAll.filter(a=>!a.makeupSlotId);
   document.getElementById('stat-classes').textContent=myTT.length;
+  document.getElementById('stat-abs-count').textContent=myAbsUnbooked.length;
+  document.getElementById('stat-makeup-count').textContent=myB.length;
   const upEl=document.getElementById('dash-upcoming');
   upEl.innerHTML=!upcoming.length?'<div class="empty-state">예정된 보강수업이 없어요.</div>':
     upcoming.sort((a,b)=>a.date.localeCompare(b.date)).map(s=>`<div class="res-item"><div><div style="font-weight:700;">${s.date} (${s.day}) ${s.time}</div><div style="font-size:11px;color:var(--mid);">담당: ${s.teacher}</div></div><div style="display:flex;gap:6px;align-items:center;"><span style="font-size:11px;color:var(--ok-txt);font-weight:700;">예정</span><button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:10px;" onclick="cancelDashMakeup('${s.id}')">취소</button></div></div>`).join('');
