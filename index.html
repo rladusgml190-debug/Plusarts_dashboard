@@ -1626,9 +1626,9 @@ function renderStudentAdmin(q=''){
   const keys=allKeys();
   const portalStudents=ld(K.STUDENTS);
   wrap.innerHTML=filtered.map(s=>{
+    try{
     const sent=s.sent||{}, sentCnt=Object.keys(sent).length, pct=Math.round(sentCnt/Math.max(keys.length,1)*100);
     const isOpen=openStudentId===s.id;
-    // find matching portal student
     const noticeLogs=logs.filter(l=>l.name===s.name);
     return `<div class="stu-card${isOpen?' open':''}">
       <div class="stu-hdr" onclick="toggleStu('${s.id}')">
@@ -1682,9 +1682,9 @@ function renderStudentAdmin(q=''){
           ${renderStuAdminTimetable(s.id)}
         </div>
 
-        <!-- 보강 예약은 결강관리 탭에서 통합 관리 -->
       </div>
     </div>`;
+    }catch(err){ console.error('학생카드 렌더 에러:', s.name, err); return ''; }
   }).join('');
 }
 
@@ -3223,7 +3223,7 @@ function renderStuAdminTimetable(adminStuId){
   if(!adm) return '<div class="empty-state" style="padding:1rem 0;">학생 정보 없음</div>';
 
   const tt = ld(K.TT);
-  const allStuClasses = ldStuClasses ? ldStuClasses() : {};
+  const allStuClasses = (typeof ldStuClasses === 'function') ? ldStuClasses() : {};
   const portalStudents = ld(K.STUDENTS);
   const portal = portalStudents.find(p=>p.name===adm.name);
   const myTT = portal ? (portal.myTT||[]) : [];
