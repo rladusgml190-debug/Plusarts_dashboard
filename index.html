@@ -3663,9 +3663,9 @@ async function saveAttendanceToSheet(date, slot){
 /* ── 결강 → 구글 시트 자동 기록 ── */
 async function syncAbsenceToSheet(studentName, absDate, absSlot, reason){
   const url = localStorage.getItem(K_ATT_SHEET_URL);
-  if(!url) return;
+  if(!url){ console.warn('출결 시트 URL 미설정'); return; }
   try {
-    await fetch(url, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: {'Content-Type':'text/plain'},
       body: JSON.stringify({
@@ -3675,15 +3675,19 @@ async function syncAbsenceToSheet(studentName, absDate, absSlot, reason){
         records: [{ name: studentName, status: '결강', teacher: '', absLabel: '', remark: reason }]
       })
     });
-  } catch(e){ console.warn('결강 시트 기록 실패:', e); }
+    const result = await res.json();
+    const dbg = result.debug||[];
+    console.log('결강 시트 기록:', dbg);
+    if(dbg.some(d=>d.includes('NOT FOUND')||d.includes('NO SHEET'))) toast('결강 시트 기록 실패: '+dbg.join(', '),'warn');
+  } catch(e){ console.warn('결강 시트 기록 실패:', e); toast('결강 시트 연동 실패','warn'); }
 }
 
 /* ── 보강 예약 → 구글 시트 자동 기록 ── */
 async function syncMakeupToSheet(studentName, makeupDate, makeupSlot, teacher, absLabel){
   const url = localStorage.getItem(K_ATT_SHEET_URL);
-  if(!url) return; // URL 미설정이면 조용히 무시
+  if(!url){ console.warn('출결 시트 URL 미설정'); return; }
   try {
-    await fetch(url, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: {'Content-Type':'text/plain'},
       body: JSON.stringify({
@@ -3698,7 +3702,11 @@ async function syncMakeupToSheet(studentName, makeupDate, makeupSlot, teacher, a
         }]
       })
     });
-  } catch(e){ console.warn('보강예정 시트 기록 실패:', e); }
+    const result = await res.json();
+    const dbg = result.debug||[];
+    console.log('보강예정 시트 기록:', dbg);
+    if(dbg.some(d=>d.includes('NOT FOUND')||d.includes('NO SHEET'))) toast('보강예정 시트 기록 실패: '+dbg.join(', '),'warn');
+  } catch(e){ console.warn('보강예정 시트 기록 실패:', e); toast('보강예정 시트 연동 실패','warn'); }
 }
 
 /* ═══════════════════════════════════════════════
