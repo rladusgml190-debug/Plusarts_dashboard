@@ -2483,20 +2483,22 @@ function doPost(e) {
   }
 }
 
-function matchDate(cell, tMonth, tDay) {
+function matchDate(cell, tMonth, tDay, tz) {
   if (!cell) return false;
   if (cell instanceof Date) {
-    return (cell.getMonth() + 1) === tMonth && cell.getDate() === tDay;
+    var cm = parseInt(Utilities.formatDate(cell, tz, 'M'));
+    var cd = parseInt(Utilities.formatDate(cell, tz, 'd'));
+    return cm === tMonth && cd === tDay;
   }
   var s = String(cell);
-  var m = s.match(/(\\d+)\\s*\\u{C6D4}\\s*(\\d+)\\s*\\u{C77C}/u);
-  if (!m) m = s.match(/(\\d+)\\uc6d4\\s*(\\d+)\\uc77c/);
+  var m = s.match(/(\\d+)\\s*\\uc6d4\\s*(\\d+)\\s*\\uc77c/);
   if (m) return parseInt(m[1]) === tMonth && parseInt(m[2]) === tDay;
   return false;
 }
 
 function handleAttendance(data) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tz = ss.getSpreadsheetTimeZone();
   var p = data.date.split('-');
   var tMonth = parseInt(p[1]);
   var tDay = parseInt(p[2]);
@@ -2507,7 +2509,7 @@ function handleAttendance(data) {
   if (slot.indexOf('14:00') === 0) colOffset = 1;
   if (slot.indexOf('18:00') === 0) colOffset = 2;
 
-  var debug = [];
+  var debug = ['tz=' + tz + ' target=' + tMonth + '/' + tDay + ' slot=' + slot + ' offset=' + colOffset];
 
   records.forEach(function(rec) {
     var sheet = ss.getSheetByName(rec.name);
@@ -2518,7 +2520,7 @@ function handleAttendance(data) {
 
     for (var r = 0; r < allData.length && !found; r++) {
       for (var c = 0; c < allData[r].length; c++) {
-        if (!matchDate(allData[r][c], tMonth, tDay)) continue;
+        if (!matchDate(allData[r][c], tMonth, tDay, tz)) continue;
 
         debug.push(rec.name + ': MATCH R' + r + ' C' + c + ' val=' + String(allData[r][c]));
 
