@@ -2854,11 +2854,29 @@ function renderTeacherToday(){
 
     const timeLabel = timeSlot==='11:00–14:00'?'오전 11:00 – 오후 2:00':timeSlot==='14:00–17:00'?'오후 2:00 – 5:00':'오후 6:00 – 9:00';
 
+    // 수업 종료 시간 체크 (출결 미기록 알림)
+    const endHourMap = {'11:00–14:00':14, '14:00–17:00':17, '18:00–21:00':21};
+    const nowHour = new Date().getHours();
+    const slotEnded = nowHour >= (endHourMap[timeSlot]||24);
+    let attAlert = '';
+    if(slotEnded && total > 0){
+      const attData = ldAttendance();
+      const attKey = todayStr+'_'+timeSlot;
+      const recorded = attData[attKey] ? Object.keys(attData[attKey]).length : 0;
+      if(recorded < total){
+        attAlert = `<div style="background:var(--err-bg);color:var(--err-txt);padding:10px 14px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <span>⚠️ 출결 미기록! ${total}명 중 ${recorded}명만 기록됨</span>
+          <button class="btn btn-sm btn-red2" onclick="showTeacherTab('attendance');document.getElementById('att-date').value='${todayStr}';document.getElementById('att-slot').value='${timeSlot}';renderAttendanceForm();">출결 기록하기</button>
+        </div>`;
+      }
+    }
+
     html += `<div class="teacher-time-block">
       <div class="teacher-time-hdr">
         <div class="teacher-time-label">${timeLabel}</div>
         <div class="teacher-time-count">정규 ${reg.count}명 + 보강 ${mkp.count}명 = 총 ${total}명</div>
-      </div>`;
+      </div>
+      ${attAlert}`;
 
     // 정규 수업 목록
     if(reg.entries.length){
