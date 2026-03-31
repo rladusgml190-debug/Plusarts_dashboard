@@ -1498,7 +1498,7 @@ function submitBooking(){
   let absLabel = '';
   if(linkedAbs){
     const ap = (linkedAbs.date||'').split('-');
-    if(ap.length===3) absLabel = ap[1].replace(/^0/,'')+'/'+ap[2].replace(/^0/,'')+'결강분';
+    if(ap.length===3) absLabel = ap[1]+ap[2]+'결강분';
     if(!linkedAbs.makeupSlotId){ linkedAbs.makeupSlotId=slot.id; linkedAbs.status='confirmed'; svAbsences(absences); }
   }
   syncMakeupToSheet(currentStudent.name, slot.date, slot.time, slot.teacher, absLabel);
@@ -3949,7 +3949,7 @@ function absBookSlot(slotId){
   // 구글 시트에 보강예정 기록
   const makeupSlot = slots[idx];
   const absParts = absDateStr.split('-');
-  const absLabel = absParts.length===3 ? (absParts[1].replace(/^0/,'')+'/'+absParts[2].replace(/^0/,'')+'결강분') : '';
+  const absLabel = absParts.length===3 ? (absParts[1]+absParts[2]+'결강분') : '';
   syncMakeupToSheet(currentStudent.name, makeupSlot.date, makeupSlot.time, makeupSlot.teacher, absLabel);
 }
 
