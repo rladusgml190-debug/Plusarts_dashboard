@@ -534,6 +534,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.1rem 0;}
       <div class="stat-grid">
         <div class="stat-box"><div class="stat-num" id="stat-total">0</div><div class="stat-lbl">총 보강 예약</div></div>
         <div class="stat-box"><div class="stat-num red" id="stat-upcoming">0</div><div class="stat-lbl">예정된 수업</div></div>
+        <div class="stat-box"><div class="stat-num red" id="stat-unbooked-abs">0</div><div class="stat-lbl">잔여 보강</div></div>
         <div class="stat-box"><div class="stat-num" id="stat-classes">0</div><div class="stat-lbl">내 정규 수업</div></div>
       </div>
       <div class="card">
@@ -1450,8 +1451,11 @@ function renderDashboard(){
   const upcoming=myB.filter(s=>s.date>=today);
   const tt=ld(K.TT);
   const myTT=tt.filter(e=>(currentStudent.myTT||[]).includes(e.id));
+  const absences=ldAbsences();
+  const myAbs=(absences[currentStudent.id]||[]).filter(a=>a.status!=='cancelled'&&!a.makeupSlotId);
   document.getElementById('stat-total').textContent=myB.length;
   document.getElementById('stat-upcoming').textContent=upcoming.length;
+  document.getElementById('stat-unbooked-abs').textContent=myAbs.length;
   document.getElementById('stat-classes').textContent=myTT.length;
   const upEl=document.getElementById('dash-upcoming');
   upEl.innerHTML=!upcoming.length?'<div class="empty-state">예정된 보강수업이 없어요.</div>':
