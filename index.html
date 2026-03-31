@@ -1490,6 +1490,18 @@ function submitBooking(){
   selectedSlotId=null; renderBookingSlots();
   // ── 이메일 발송 ──
   sendBookingEmail(currentStudent, slot);
+
+  // 구글 시트에 보강예정 기록 (연결된 결강 날짜 찾기)
+  const absences = ldAbsences();
+  const absList = absences[currentStudent.id]||[];
+  const linkedAbs = absList.find(a=>a.makeupSlotId===slot.id) || absList.find(a=>!a.makeupSlotId&&a.status!=='cancelled');
+  let absLabel = '';
+  if(linkedAbs){
+    const ap = (linkedAbs.date||'').split('-');
+    if(ap.length===3) absLabel = ap[1].replace(/^0/,'')+'/'+ap[2].replace(/^0/,'')+'결강분';
+    if(!linkedAbs.makeupSlotId){ linkedAbs.makeupSlotId=slot.id; linkedAbs.status='confirmed'; svAbsences(absences); }
+  }
+  syncMakeupToSheet(currentStudent.name, slot.date, slot.time, slot.teacher, absLabel);
 }
 
 function sendBookingEmail(student, slot){
@@ -2534,8 +2546,13 @@ function handleAttendance(data) {
             sheet.getRange(sr + 1, c + 1 + colOffset).setValue(rec.status);
             debug.push('  STATUS R' + (sr+1) + ' C' + (c+1+colOffset) + ' = ' + rec.status);
             found = true;
-            break;
           }
+          if (lbl.indexOf('\\uD68C\\uCC28') > -1 && rec.absLabel) {
+            sheet.getRange(sr + 1, c + 1 + colOffset).setValue(rec.absLabel);
+            debug.push('  ROUND R' + (sr+1) + ' C' + (c+1+colOffset) + ' = ' + rec.absLabel);
+          }
+          if (found && lbl.indexOf('\\uD68C\\uCC28') > -1) break;
+          if (found && lbl.indexOf('\\uBE44\\uACE0') > -1) break;
         }
         if (found) break;
       }
@@ -3551,6 +3568,29 @@ async function saveAttendanceToSheet(date, slot){
   }
 }
 
+/* ── 보강 예약 → 구글 시트 자동 기록 ── */
+async function syncMakeupToSheet(studentName, makeupDate, makeupSlot, teacher, absLabel){
+  const url = localStorage.getItem(K_ATT_SHEET_URL);
+  if(!url) return; // URL 미설정이면 조용히 무시
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type':'text/plain'},
+      body: JSON.stringify({
+        action: 'attendance',
+        date: makeupDate,
+        slot: makeupSlot,
+        records: [{
+          name: studentName,
+          status: '보강예정',
+          teacher: teacher || '',
+          absLabel: absLabel || ''
+        }]
+      })
+    });
+  } catch(e){ console.warn('보강예정 시트 기록 실패:', e); }
+}
+
 /* ═══════════════════════════════════════════════
    ABSENCE (결강) SYSTEM
 ═══════════════════════════════════════════════ */
@@ -3892,13 +3932,25 @@ function absBookSlot(slotId){
   const list = absences[currentStudent.id]||[];
   // mark the most recent pending absence
   const recent = list.find(a=>a.status==='pending'||a.status==='confirmed');
-  if(recent){ recent.makeupSlotId = slotId; recent.status='confirmed'; svAbsences(absences); }
+  let absDateStr = '';
+  if(recent){
+    recent.makeupSlotId = slotId;
+    recent.status='confirmed';
+    absDateStr = recent.date || '';
+    svAbsences(absences);
+  }
 
   toast(`보강 예약 완료! ${slots[idx].date} (${slots[idx].day}) ${slots[idx].time} 🎉`);
   renderAbsMakeupSlots();
   renderMyAbsences();
   document.getElementById('abs-makeup-card').style.display='none';
   sendBookingEmail(currentStudent, slots[idx]);
+
+  // 구글 시트에 보강예정 기록
+  const makeupSlot = slots[idx];
+  const absParts = absDateStr.split('-');
+  const absLabel = absParts.length===3 ? (absParts[1].replace(/^0/,'')+'/'+absParts[2].replace(/^0/,'')+'결강분') : '';
+  syncMakeupToSheet(currentStudent.name, makeupSlot.date, makeupSlot.time, makeupSlot.teacher, absLabel);
 }
 
 /* ── 관리자 결강 관리 패널 ── */
