@@ -953,7 +953,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.1rem 0;}
         </div>
         <div class="card">
           <div class="card-title">등록된 <span>정규 수업</span></div>
-          <div id="ttAdminList"></div>
+          <div id="ttAdminGrid" class="tt-wrap"></div>
           <div id="ttAdminEmpty" class="empty-state" style="display:none;">등록된 정규 수업이 없어요.</div>
         </div>
         <!-- 학생-수업 연결 -->
@@ -1919,14 +1919,47 @@ function addTTEntry(){
 }
 function deleteTTEntry(id){if(!confirm('삭제할까요?'))return;sv(K.TT,ld(K.TT).filter(e=>e.id!==id));renderTTAdminList();}
 function renderTTAdminList(){
-  const tt=ld(K.TT), c=document.getElementById('ttAdminList'), em=document.getElementById('ttAdminEmpty');
-  c.innerHTML='';
-  if(!tt.length){em.style.display='block';return;} em.style.display='none';
-  tt.forEach(e=>{
-    const div=document.createElement('div'); div.className='slot-item';
-    div.innerHTML=`<div><div class="slot-title">${e.day}요일 ${e.slot}</div><div class="slot-meta">${e.name} · 담당: ${e.teacher}</div></div><div class="slot-actions"><button class="btn btn-sm" onclick="openStudentTTPanel2('${e.id}','${e.name}')">학생 연결</button><button class="btn btn-sm btn-danger" onclick="deleteTTEntry('${e.id}')">삭제</button></div>`;
-    c.appendChild(div);
+  const tt=ld(K.TT), c=document.getElementById('ttAdminGrid'), em=document.getElementById('ttAdminEmpty');
+  if(!tt.length){c.innerHTML=''; em.style.display='block';return;} em.style.display='none';
+
+  const DAYS=['화','수','목','금','토'];
+  const SLOTS=['11:00–14:00','14:00–17:00','18:00–21:00'];
+  const SLOT_LABELS={'11:00–14:00':'오전 11:00–14:00','14:00–17:00':'오후 14:00–17:00','18:00–21:00':'오후 18:00–21:00'};
+  const BG=['#FFF8E1','#E8F5E9','#E3F2FD'];
+  const BD=['#E6C200','#43A047','#1976D2'];
+
+  let html=`<table class="tt-table"><thead><tr><th style="width:100px;">시간</th>`;
+  DAYS.forEach(d=>{html+=`<th>${d}요일</th>`;});
+  html+=`</tr></thead><tbody>`;
+
+  SLOTS.forEach((slot,si)=>{
+    html+=`<tr><td style="font-size:11px;white-space:nowrap;">${SLOT_LABELS[slot]}</td>`;
+    DAYS.forEach(day=>{
+      const entries=tt.filter(e=>e.day===day&&e.slot===slot);
+      if(!entries.length){
+        html+=`<td style="background:var(--gray);"><div class="tt-cell empty-slot">—</div></td>`;
+      } else {
+        html+=`<td style="padding:4px;">`;
+        entries.forEach(e=>{
+          html+=`<div class="tt-cell" style="background:${BG[si]};border-color:${BD[si]};margin-bottom:4px;">
+            <div class="tt-name" style="display:flex;align-items:center;justify-content:space-between;">
+              <span>${e.name}</span>
+              <span style="display:flex;gap:3px;">
+                <button class="btn btn-sm" style="padding:2px 6px;font-size:10px;" onclick="openStudentTTPanel2('${e.id}','${e.name}')">연결</button>
+                <button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px;" onclick="deleteTTEntry('${e.id}')">×</button>
+              </span>
+            </div>
+            <div class="tt-teacher">${e.teacher}</div>
+          </div>`;
+        });
+        html+=`</td>`;
+      }
+    });
+    html+=`</tr>`;
   });
+
+  html+=`</tbody></table>`;
+  c.innerHTML=html;
 }
 
 let editingStudentIdTT=null;
