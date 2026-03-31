@@ -917,7 +917,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.1rem 0;}
         </div>
         <div class="card">
           <div class="card-title">등록된 <span>슬롯</span></div>
-          <div id="adminSlotList"></div>
+          <div id="adminSlotGrid" class="tt-wrap"></div>
           <div id="adminNoSlot" class="empty-state" style="display:none;">등록된 슬롯이 없어요.</div>
         </div>
         <div class="card" id="reservationPanel" style="display:none;">
@@ -1887,15 +1887,67 @@ function addSlot(){
   selectedDay=null; selectedTime=null; renderAdminSlots(); setTimeout(()=>al.innerHTML='',2500);
 }
 function renderAdminSlots(){
-  const slots=ld(K.SLOTS), c=document.getElementById('adminSlotList'), em=document.getElementById('adminNoSlot');
-  c.innerHTML='';
-  if(!slots.length){em.style.display='block';return;} em.style.display='none';
-  slots.slice().reverse().forEach(s=>{
-    const booked=(s.reservations||[]).length;
-    const div=document.createElement('div'); div.className='slot-item';
-    div.innerHTML=`<div><div class="slot-title">${s.date} (${s.day}) ${s.time}<span class="badge ${s.active?'badge-open':'badge-hidden'}">${s.active?'공개':'비공개'}</span></div><div class="slot-meta">담당: ${s.teacher} · ${booked}/${s.max}명</div></div><div class="slot-actions"><button class="btn btn-sm" onclick="viewReservations('${s.id}')">예약자</button><button class="btn btn-sm" onclick="toggleSlot('${s.id}')">${s.active?'비공개':'공개'}</button><button class="btn btn-sm btn-danger" onclick="deleteSlot('${s.id}')">삭제</button></div>`;
-    c.appendChild(div);
+  const slots=ld(K.SLOTS), c=document.getElementById('adminSlotGrid'), em=document.getElementById('adminNoSlot');
+  if(!slots.length){c.innerHTML=''; em.style.display='block';return;} em.style.display='none';
+
+  const TIMES=['11:00–14:00','14:00–17:00','18:00–21:00'];
+  const TIME_LABELS={'11:00–14:00':'오전 11:00–14:00','14:00–17:00':'오후 14:00–17:00','18:00–21:00':'오후 18:00–21:00'};
+  const BG=['#FFF8E1','#E8F5E9','#E3F2FD'];
+  const BD=['#E6C200','#43A047','#1976D2'];
+  const TX=['#7A5A00','#1B5E20','#0D47A1'];
+
+  // 날짜 기준 오름차순 정렬, 고유 날짜 추출
+  const sorted=slots.slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const dates=[...new Set(sorted.map(s=>s.date))];
+
+  // 과거/미래 구분
+  const today=new Date().toISOString().split('T')[0];
+
+  let html=`<table class="tt-table"><thead><tr><th style="width:100px;">시간</th>`;
+  dates.forEach(d=>{
+    const s=sorted.find(sl=>sl.date===d);
+    const isPast=d<today;
+    html+=`<th style="${isPast?'opacity:.5;':''}font-size:12px;">${d.slice(5)}<br/><span style="font-size:10px;color:${isPast?'#888':'#F08080'};">(${s?s.day:''})</span></th>`;
   });
+  html+=`</tr></thead><tbody>`;
+
+  TIMES.forEach((time,ti)=>{
+    html+=`<tr><td style="font-size:11px;white-space:nowrap;">${TIME_LABELS[time]}</td>`;
+    dates.forEach(date=>{
+      const slot=sorted.find(s=>s.date===date&&s.time===time);
+      const isPast=date<today;
+      if(!slot){
+        html+=`<td style="background:var(--gray);"><div class="tt-cell empty-slot">—</div></td>`;
+      } else {
+        const booked=(slot.reservations||[]).length;
+        const full=booked>=slot.max;
+        const stuNames=(slot.reservations||[]).map(r=>r.name);
+        html+=`<td style="padding:4px;${isPast?'opacity:.6;':''}">
+          <div class="tt-cell" style="background:${BG[ti]};border-color:${BD[ti]};border-width:2px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">
+              <span style="font-weight:700;font-size:12px;color:${TX[ti]};">${slot.teacher}</span>
+              <span class="badge ${slot.active?'badge-open':'badge-hidden'}" style="margin:0;">${slot.active?'공개':'비공개'}</span>
+            </div>
+            <div style="font-size:11px;color:${TX[ti]};margin-top:3px;">
+              <span style="font-weight:700;${full?'color:var(--err-txt);':''}">${booked}/${slot.max}명</span>
+            </div>
+            ${stuNames.length
+              ? `<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px;">${stuNames.map(n=>`<span style="font-size:10px;background:var(--white);border:1px solid var(--border2);border-radius:3px;padding:1px 6px;color:var(--black);">${n}</span>`).join('')}</div>`
+              : `<div style="margin-top:4px;font-size:10px;color:var(--mid);font-style:italic;">예약자 없음</div>`}
+            <div style="display:flex;gap:3px;margin-top:6px;">
+              <button class="btn btn-sm" style="padding:2px 6px;font-size:10px;" onclick="viewReservations('${slot.id}')">상세</button>
+              <button class="btn btn-sm" style="padding:2px 6px;font-size:10px;" onclick="toggleSlot('${slot.id}')">${slot.active?'비공개':'공개'}</button>
+              <button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px;" onclick="deleteSlot('${slot.id}')">×</button>
+            </div>
+          </div>
+        </td>`;
+      }
+    });
+    html+=`</tr>`;
+  });
+
+  html+=`</tbody></table>`;
+  c.innerHTML=html;
 }
 function toggleSlot(id){const slots=ld(K.SLOTS),idx=slots.findIndex(s=>s.id===id);if(idx!==-1){slots[idx].active=!slots[idx].active;sv(K.SLOTS,slots);renderAdminSlots();}}
 function deleteSlot(id){if(!confirm('삭제할까요?'))return;sv(K.SLOTS,ld(K.SLOTS).filter(s=>s.id!==id));renderAdminSlots();document.getElementById('reservationPanel').style.display='none';}
