@@ -1922,11 +1922,17 @@ function renderTTAdminList(){
   const tt=ld(K.TT), c=document.getElementById('ttAdminGrid'), em=document.getElementById('ttAdminEmpty');
   if(!tt.length){c.innerHTML=''; em.style.display='block';return;} em.style.display='none';
 
+  const portalStudents=ld(K.STUDENTS);
   const DAYS=['화','수','목','금','토'];
   const SLOTS=['11:00–14:00','14:00–17:00','18:00–21:00'];
   const SLOT_LABELS={'11:00–14:00':'오전 11:00–14:00','14:00–17:00':'오후 14:00–17:00','18:00–21:00':'오후 18:00–21:00'};
   const BG=['#FFF8E1','#E8F5E9','#E3F2FD'];
   const BD=['#E6C200','#43A047','#1976D2'];
+
+  // 각 수업에 연결된 학생 목록 구하기
+  function getLinkedStudents(ttId){
+    return portalStudents.filter(s=>(s.myTT||[]).includes(ttId)).map(s=>s.name);
+  }
 
   let html=`<table class="tt-table"><thead><tr><th style="width:100px;">시간</th>`;
   DAYS.forEach(d=>{html+=`<th>${d}요일</th>`;});
@@ -1941,6 +1947,7 @@ function renderTTAdminList(){
       } else {
         html+=`<td style="padding:4px;">`;
         entries.forEach(e=>{
+          const stuNames=getLinkedStudents(e.id);
           html+=`<div class="tt-cell" style="background:${BG[si]};border-color:${BD[si]};margin-bottom:4px;">
             <div class="tt-name" style="display:flex;align-items:center;justify-content:space-between;">
               <span>${e.name}</span>
@@ -1950,6 +1957,9 @@ function renderTTAdminList(){
               </span>
             </div>
             <div class="tt-teacher">${e.teacher}</div>
+            ${stuNames.length
+              ? `<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;">${stuNames.map(n=>`<span style="font-size:10px;background:var(--white);border:1px solid var(--border2);border-radius:3px;padding:1px 6px;color:var(--black);">${n}</span>`).join('')}</div>`
+              : `<div style="margin-top:4px;font-size:10px;color:var(--mid);font-style:italic;">등록 학생 없음</div>`}
           </div>`;
         });
         html+=`</td>`;
