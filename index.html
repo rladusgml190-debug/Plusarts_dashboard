@@ -734,6 +734,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.1rem 0;}
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
           <span style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mid);">전체 결강 현황</span>
           <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn btn-sm btn-red2" onclick="openAdminAbsenceAdd()">+ 결강 추가</button>
             <select id="abs-filter-status" onchange="renderAdminAbsencePanel()" style="padding:6px 10px;font-size:12px;border:1px solid var(--border2);border-radius:4px;background:var(--white);color:var(--black);">
               <option value="">전체</option>
               <option value="pending">확인 중</option>
@@ -798,6 +799,41 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.1rem 0;}
           <div class="btn-row">
             <button class="btn btn-primary" onclick="saveAdminMakeupAssign()">💾 보강 지정 및 시트 기록</button>
             <button class="btn btn-sm" onclick="document.getElementById('abs-makeup-assign-panel').style.display='none'">닫기</button>
+          </div>
+        </div>
+
+        <!-- 결강 추가 패널 -->
+        <div class="card" id="abs-admin-add-panel" style="display:none;margin-top:12px;">
+          <div class="card-title">결강 <span>추가</span></div>
+          <div class="form-row"><label>학생 선택</label>
+            <select id="abs-add-student"></select>
+          </div>
+          <div class="g2" style="margin-bottom:8px;">
+            <div class="form-row" style="margin:0;"><label>결강 날짜</label><input type="date" id="abs-add-date"/></div>
+            <div class="form-row" style="margin:0;"><label>시간대</label>
+              <select id="abs-add-slot">
+                <option value="11:00–14:00">오전 11:00 – 오후 2:00</option>
+                <option value="14:00–17:00">오후 2:00 – 5:00</option>
+                <option value="18:00–21:00">오후 6:00 – 9:00</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row"><label>결강 사유</label>
+            <select id="abs-add-reason">
+              <option value="건강/몸살">건강 / 몸살</option>
+              <option value="학교시험">학교 시험</option>
+              <option value="학교행사">학교 행사</option>
+              <option value="가족행사">가족 행사</option>
+              <option value="해외여행">해외 여행</option>
+              <option value="개인사정">개인 사정</option>
+              <option value="당일결강">당일 결강</option>
+              <option value="기타">기타</option>
+            </select>
+          </div>
+          <div id="abs-add-alert"></div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="saveAdminAbsenceAdd()">💾 결강 추가</button>
+            <button class="btn btn-sm" onclick="document.getElementById('abs-admin-add-panel').style.display='none'">닫기</button>
           </div>
         </div>
       </div>
@@ -1419,10 +1455,29 @@ function renderDashboard(){
   document.getElementById('stat-classes').textContent=myTT.length;
   const upEl=document.getElementById('dash-upcoming');
   upEl.innerHTML=!upcoming.length?'<div class="empty-state">예정된 보강수업이 없어요.</div>':
-    upcoming.sort((a,b)=>a.date.localeCompare(b.date)).map(s=>`<div class="res-item"><div><div style="font-weight:700;">${s.date} (${s.day}) ${s.time}</div><div style="font-size:11px;color:var(--mid);">담당: ${s.teacher}</div></div><div style="font-size:11px;color:var(--ok-txt);font-weight:700;">예정</div></div>`).join('');
+    upcoming.sort((a,b)=>a.date.localeCompare(b.date)).map(s=>`<div class="res-item"><div><div style="font-weight:700;">${s.date} (${s.day}) ${s.time}</div><div style="font-size:11px;color:var(--mid);">담당: ${s.teacher}</div></div><div style="display:flex;gap:6px;align-items:center;"><span style="font-size:11px;color:var(--ok-txt);font-weight:700;">예정</span><button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:10px;" onclick="cancelDashMakeup('${s.id}')">취소</button></div></div>`).join('');
   const histEl=document.getElementById('dash-history');
   histEl.innerHTML=!myB.length?'<div class="empty-state">예약 기록이 없어요.</div>':
-    myB.sort((a,b)=>b.date.localeCompare(a.date)).map(s=>{const past=s.date<today;return`<div class="res-item"><div><div style="font-weight:700;">${s.date} (${s.day}) ${s.time}</div><div style="font-size:11px;color:var(--mid);">담당: ${s.teacher}</div></div><div style="font-size:11px;font-weight:700;color:${past?'var(--mid)':'var(--ok-txt)'};">${past?'완료':'예정'}</div></div>`;}).join('');
+    myB.sort((a,b)=>b.date.localeCompare(a.date)).map(s=>{const past=s.date<today;return`<div class="res-item"><div><div style="font-weight:700;">${s.date} (${s.day}) ${s.time}</div><div style="font-size:11px;color:var(--mid);">담당: ${s.teacher}</div></div><div style="display:flex;gap:6px;align-items:center;"><span style="font-size:11px;font-weight:700;color:${past?'var(--mid)':'var(--ok-txt)'};">${past?'완료':'예정'}</span>${!past?`<button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:10px;" onclick="cancelDashMakeup('${s.id}')">취소</button>`:''}</div></div>`;}).join('');
+}
+
+function cancelDashMakeup(slotId){
+  if(!currentStudent) return;
+  if(!confirm('보강 예약을 취소할까요?')) return;
+  // 슬롯에서 예약 제거
+  const slots = ld(K.SLOTS);
+  const sIdx = slots.findIndex(s=>s.id===slotId);
+  if(sIdx!==-1){
+    slots[sIdx].reservations = (slots[sIdx].reservations||[]).filter(r=>r.studentId!==currentStudent.id);
+    sv(K.SLOTS, slots);
+  }
+  // 연결된 결강의 makeupSlotId 해제
+  const absences = ldAbsences();
+  const list = absences[currentStudent.id]||[];
+  const linked = list.find(a=>a.makeupSlotId===slotId);
+  if(linked){ linked.makeupSlotId=''; linked.status='pending'; svAbsences(absences); }
+  renderDashboard();
+  toast('보강 예약이 취소됐어요.');
 }
 
 /* ── 학생 시간표 ── */
@@ -4196,6 +4251,52 @@ function deleteAbsAdmin(portalId, absId){
   if(absences[portalId]) absences[portalId]=absences[portalId].filter(a=>a.id!==absId);
   svAbsences(absences);
   renderAdminAbsencePanel();
+}
+
+/* ── 관리자 결강 추가 ── */
+function openAdminAbsenceAdd(){
+  const portalStudents = ld(K.STUDENTS);
+  const sel = document.getElementById('abs-add-student');
+  sel.innerHTML = '<option value="">학생 선택</option>' + portalStudents.sort((a,b)=>a.name.localeCompare(b.name)).map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  document.getElementById('abs-add-alert').innerHTML = '';
+  document.getElementById('abs-admin-add-panel').style.display='block';
+  document.getElementById('abs-admin-add-panel').scrollIntoView({behavior:'smooth'});
+}
+
+function saveAdminAbsenceAdd(){
+  const stuId = document.getElementById('abs-add-student').value;
+  const date = document.getElementById('abs-add-date').value;
+  const slot = document.getElementById('abs-add-slot').value;
+  const reason = document.getElementById('abs-add-reason').value;
+  const alertEl = document.getElementById('abs-add-alert');
+
+  if(!stuId){ alertEl.innerHTML='<div class="alert alert-err">학생을 선택해주세요.</div>'; return; }
+  if(!date){ alertEl.innerHTML='<div class="alert alert-err">날짜를 선택해주세요.</div>'; return; }
+
+  const absences = ldAbsences();
+  if(!absences[stuId]) absences[stuId] = [];
+
+  if(absences[stuId].some(a => a.date===date && a.slot===slot)){
+    alertEl.innerHTML='<div class="alert alert-err">이미 같은 날짜/시간에 결강이 있어요.</div>'; return;
+  }
+
+  absences[stuId].unshift({
+    id: Date.now().toString(),
+    date, slot, reason,
+    status: 'confirmed',
+    notice: '',
+    ts: Date.now()
+  });
+  svAbsences(absences);
+
+  // 구글 시트에 결강 기록
+  const portalStudents = ld(K.STUDENTS);
+  const stu = portalStudents.find(p=>p.id===stuId);
+  if(stu) syncAbsenceToSheet(stu.name, date, slot, reason);
+
+  document.getElementById('abs-admin-add-panel').style.display='none';
+  renderAdminAbsencePanel();
+  toast('결강이 추가됐어요!');
 }
 
 /* ── 관리자 보강 지정 ── */
