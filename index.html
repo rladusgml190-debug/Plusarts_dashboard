@@ -2488,17 +2488,25 @@ function doPost(e) {
   }
 }
 
+function cellToDateText(cell) {
+  if (!cell) return '';
+  if (cell instanceof Date) {
+    var m = cell.getMonth() + 1;
+    var d = cell.getDate();
+    return m + '\\uC6D4 ' + d + '\\uC77C';
+  }
+  return String(cell).trim();
+}
+
 function handleAttendance(data) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var date = data.date;
-  var slot = data.slot;
-  var records = data.records; // [{name, status, date, slot, teacher}]
+  var dateParts = data.date.split('-');
+  var targetMonth = parseInt(dateParts[1]);
+  var targetDay = parseInt(dateParts[2]);
+  var target = targetMonth + '\\uC6D4 ' + targetDay + '\\uC77C';
+  var slot = data.slot || '';
+  var records = data.records;
 
-  // 입력 날짜에서 목표 "M월 D일" 문자열 생성
-  var parts = date.split('-');
-  var target = parseInt(parts[1]) + '월 ' + parseInt(parts[2]) + '일';
-
-  // 세션 오프셋: 시작시간 기준
   var colOffset = 0;
   if (slot.indexOf('14:00') === 0) colOffset = 1;
   if (slot.indexOf('18:00') === 0) colOffset = 2;
@@ -2507,49 +2515,44 @@ function handleAttendance(data) {
 
   records.forEach(function(rec) {
     var sheet = ss.getSheetByName(rec.name);
-    if (!sheet) { debug.push(rec.name + ': 시트 없음'); return; }
+    if (!sheet) { debug.push(rec.name + ': sheet not found'); return; }
 
     var allData = sheet.getDataRange().getValues();
     var found = false;
+    var dateCol = -1;
+    var dateRow = -1;
 
+    // Step 1: 모든 셀에서 목표 날짜 찾기
     for (var r = 0; r < allData.length && !found; r++) {
-      // 첫 번째 열이 "일자"인 행만 검색
-      if (String(allData[r][0] || '').trim() !== '일자') continue;
+      for (var c = 0; c < allData[r].length; c++) {
+        var ct = cellToDateText(allData[r][c]);
+        if (ct === target) {
+          dateCol = c;
+          dateRow = r;
+          debug.push(rec.name + ': found ' + target + ' at R' + r + 'C' + c);
 
-      for (var c = 1; c < allData[r].length; c++) {
-        var cell = allData[r][c];
-        if (!cell) continue;
-
-        // 날짜 셀 파싱 (Date 객체 또는 문자열)
-        var cellText = '';
-        if (cell instanceof Date) {
-          cellText = Utilities.formatDate(cell, Session.getScriptTimeZone(), 'M월 d일');
-        } else {
-          cellText = String(cell).trim();
-        }
-
-        if (cellText !== target) continue;
-
-        // 이 날짜 열(c)에서 아래로 "강사", "출결" 행 찾기
-        for (var sr = r + 1; sr < Math.min(r + 10, allData.length); sr++) {
-          var label = String(allData[sr][0] || '').trim();
-          if (label === '강사' && rec.teacher) {
-            sheet.getRange(sr + 1, c + 1 + colOffset).setValue(rec.teacher);
+          // Step 2: 이 위치에서 아래로 강사/출결 행 찾기
+          for (var sr = r + 1; sr < Math.min(r + 10, allData.length); sr++) {
+            var label = String(allData[sr][0] || '').trim();
+            if (label.indexOf('\\uAC15\\uC0AC') !== -1 && rec.teacher) {
+              sheet.getRange(sr + 1, c + 1 + colOffset).setValue(rec.teacher);
+              debug.push('  teacher at R' + (sr+1) + 'C' + (c+1+colOffset));
+            }
+            if (label.indexOf('\\uCD9C\\uACB0') !== -1) {
+              sheet.getRange(sr + 1, c + 1 + colOffset).setValue(rec.status);
+              debug.push('  status at R' + (sr+1) + 'C' + (c+1+colOffset) + '=' + rec.status);
+              found = true;
+              break;
+            }
           }
-          if (label === '출결') {
-            sheet.getRange(sr + 1, c + 1 + colOffset).setValue(rec.status);
-            found = true;
-            debug.push(rec.name + ': ' + target + ' R' + (sr+1) + 'C' + (c+1+colOffset) + '=' + rec.status);
-            break;
-          }
+          if (found) break;
         }
-        if (found) break;
       }
     }
-    if (!found) debug.push(rec.name + ': ' + target + ' 못 찾음');
+    if (!found) debug.push(rec.name + ': ' + target + ' not found in sheet');
   });
 
-  return ContentService.createTextOutput(JSON.stringify({success: true, count: records.length, debug: debug}))
+  return ContentService.createTextOutput(JSON.stringify({success:true, count:records.length, debug:debug}))
     .setMimeType(ContentService.MimeType.JSON);
 }`;
 
