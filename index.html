@@ -1714,7 +1714,7 @@ function switchAdminTab(t){
   if(t==='students') renderStudentAdmin();
   if(t==='timetable') renderTTAdminList();
   if(t==='attendance') initAdminAttendanceTab();
-  if(t==='settings'){const u=getSheetsUrl();const el=document.getElementById('sheet-url-input');if(el&&u)el.value=u;const au=localStorage.getItem(K_ATT_SHEET_URL)||'';const ael=document.getElementById('att-sheet-url-input');if(ael&&au)ael.value=au;updateSyncStatus();}
+  if(t==='settings'){const u=getSheetsUrl();const el=document.getElementById('sheet-url-input');if(el&&u)el.value=u;const au=getAttSheetUrl();const ael=document.getElementById('att-sheet-url-input');if(ael&&au)ael.value=au;updateSyncStatus();}
 }
 
 /* ── 비밀번호 변경 ── */
@@ -2395,7 +2395,14 @@ const K_SHEETS_LAST = 'pa_sheets_last';
 let sheetsPollingTimer = null;
 
 function getSheetsUrl(){
-  return localStorage.getItem(K_SHEETS_URL) || '';
+  let url = localStorage.getItem(K_SHEETS_URL) || '';
+  try { url = JSON.parse(url); } catch(e){}
+  return typeof url === 'string' ? url : '';
+}
+function getAttSheetUrl(){
+  let url = localStorage.getItem(K_ATT_SHEET_URL) || '';
+  try { url = JSON.parse(url); } catch(e){}
+  return typeof url === 'string' ? url : '';
 }
 
 async function fetchSheetsData(){
@@ -3621,7 +3628,7 @@ function renderAttendanceHistory(){
 
 /* ── 구글 시트 출결 연동 ── */
 async function saveAttendanceToSheet(date, slot){
-  const url = localStorage.getItem(K_ATT_SHEET_URL);
+  const url = getAttSheetUrl();
   if(!url){
     toast('관리자 설정에서 출결 시트 Apps Script URL을 먼저 등록해주세요.','warn');
     return;
@@ -3664,7 +3671,7 @@ async function saveAttendanceToSheet(date, slot){
 
 /* ── 결강 → 구글 시트 자동 기록 ── */
 async function syncAbsenceToSheet(studentName, absDate, absSlot, reason){
-  const url = localStorage.getItem(K_ATT_SHEET_URL);
+  const url = getAttSheetUrl();
   if(!url){ console.warn('출결 시트 URL 미설정'); return; }
   try {
     const res = await fetch(url, {
@@ -3686,7 +3693,7 @@ async function syncAbsenceToSheet(studentName, absDate, absSlot, reason){
 
 /* ── 보강 예약 → 구글 시트 자동 기록 ── */
 async function syncMakeupToSheet(studentName, makeupDate, makeupSlot, teacher, absLabel){
-  const url = localStorage.getItem(K_ATT_SHEET_URL);
+  const url = getAttSheetUrl();
   if(!url){ console.warn('출결 시트 URL 미설정'); return; }
   try {
     const res = await fetch(url, {
