@@ -3306,7 +3306,7 @@ function renderAdminAttendanceForm(){
         <div style="font-size:11px;color:var(--mid);margin-top:2px;">${s.className?s.className+' · ':''}담당: ${s.teacher}</div>
       </div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;">
-        ${ATT_STATUS_LIST.map(st =>
+        ${(s.type==='보강'?ATT_STATUS_LIST.filter(st=>['보강완료','보강결강','당일결강'].includes(st.value)):ATT_STATUS_LIST).map(st =>
           `<button class="btn btn-sm" style="padding:4px 10px;font-size:11px;${curStatus===st.value?'background:'+st.bg+';color:'+st.color+';border-color:'+st.color+';font-weight:700;':''}" onclick="setAdminAttStatus('${date}','${slot}','${s.id}','${st.value}','${(s.teacher||'').replace(/'/g,"\\'")}')">${st.label}</button>`
         ).join('')}
         ${curStatus?`<button class="btn btn-sm" style="padding:4px 8px;font-size:11px;color:var(--mid);" onclick="setAdminAttStatus('${date}','${slot}','${s.id}','','')">✕</button>`:''}
@@ -3438,7 +3438,7 @@ function renderAttendanceForm(){
         <div style="font-size:11px;color:var(--mid);margin-top:2px;">${s.className?s.className+' · ':''}담당: ${s.teacher}</div>
       </div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;">
-        ${ATT_STATUS_LIST.map(st =>
+        ${(s.type==='보강'?ATT_STATUS_LIST.filter(st=>['보강완료','보강결강','당일결강'].includes(st.value)):ATT_STATUS_LIST).map(st =>
           `<button class="btn btn-sm" style="padding:4px 10px;font-size:11px;${curStatus===st.value?'background:'+st.bg+';color:'+st.color+';border-color:'+st.color+';font-weight:700;':''}" onclick="setAttStatus('${date}','${slot}','${s.id}','${st.value}','${(s.teacher||'').replace(/'/g,"\\'")}')">${st.label}</button>`
         ).join('')}
         ${curStatus?`<button class="btn btn-sm" style="padding:4px 8px;font-size:11px;color:var(--mid);" onclick="setAttStatus('${date}','${slot}','${s.id}','','')">✕</button>`:''}
