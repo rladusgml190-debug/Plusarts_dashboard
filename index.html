@@ -2499,6 +2499,7 @@ function saveSheetUrl(){
   const url = document.getElementById('sheet-url-input').value.trim();
   if(!url){ toast('URL을 입력해주세요.','warn'); return; }
   localStorage.setItem(K_SHEETS_URL, url);
+  if(window.fbSave) window.fbSave(K_SHEETS_URL, url);
   toast('URL이 저장됐어요! 동기화를 시작합니다.');
   startSheetsPolling();
   updateSyncStatus();
@@ -2558,6 +2559,7 @@ function saveAttSheetUrl(){
   const url = document.getElementById('att-sheet-url-input').value.trim();
   if(!url){ toast('URL을 입력해주세요.','warn'); return; }
   localStorage.setItem(K_ATT_SHEET_URL, url);
+  if(window.fbSave) window.fbSave(K_ATT_SHEET_URL, url);
   toast('출결 시트 URL이 저장됐어요!');
 }
 
