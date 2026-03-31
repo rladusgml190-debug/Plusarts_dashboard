@@ -2512,6 +2512,7 @@ function handleAttendance(data) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var tz = ss.getSpreadsheetTimeZone();
   var p = data.date.split('-');
+  var tYear = parseInt(p[0]);
   var tMonth = parseInt(p[1]);
   var tDay = parseInt(p[2]);
   var slot = data.slot || '';
@@ -2521,7 +2522,7 @@ function handleAttendance(data) {
   if (slot.indexOf('14:00') === 0) colOffset = 1;
   if (slot.indexOf('18:00') === 0) colOffset = 2;
 
-  var debug = ['tz=' + tz + ' target=' + tMonth + '/' + tDay + ' slot=' + slot + ' offset=' + colOffset];
+  var debug = ['tz=' + tz + ' target=' + tYear + '/' + tMonth + '/' + tDay + ' slot=' + slot + ' offset=' + colOffset];
 
   records.forEach(function(rec) {
     var sheet = ss.getSheetByName(rec.name);
@@ -2529,8 +2530,17 @@ function handleAttendance(data) {
 
     var allData = sheet.getDataRange().getValues();
     var found = false;
+    var currentYear = 0;
 
     for (var r = 0; r < allData.length && !found; r++) {
+      // 연도+월 헤더 행 감지 (예: "2026년 4월")
+      var firstCell = String(allData[r][0] || '');
+      var ym = firstCell.match(/(\\d{4})\\s*\\ub144\\s*(\\d+)\\s*\\uc6d4/);
+      if (ym) currentYear = parseInt(ym[1]);
+
+      // 연도가 다르면 건너뛰기
+      if (currentYear !== tYear) continue;
+
       for (var c = 0; c < allData[r].length; c++) {
         if (!matchDate(allData[r][c], tMonth, tDay, tz)) continue;
 
