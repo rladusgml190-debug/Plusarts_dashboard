@@ -3726,19 +3726,32 @@ function renderMyAbsences(){
   if(!list.length){ el.innerHTML=''; if(em) em.style.display='block'; return; }
   if(em) em.style.display='none';
   const dayNames=['일','월','화','수','목','금','토'];
+  const slots = ld(K.SLOTS);
   el.innerHTML = list.map(a=>{
     const dateObj = new Date(a.date);
     const dayName = dayNames[dateObj.getDay()];
     const statusMap = {pending:'확인 중', confirmed:'확인 완료', cancelled:'취소됨'};
     const statusClass = {pending:'abs-pending', confirmed:'abs-confirmed', cancelled:'abs-cancelled'};
-    return `<div class="absence-item">
-      <span class="absence-status ${statusClass[a.status]||'abs-pending'}">${statusMap[a.status]||'확인 중'}</span>
-      <div class="absence-info">
-        <div class="absence-date">${a.date} (${dayName}) ${a.slot}</div>
-        <div class="absence-reason">사유: ${a.reason}</div>
-        ${a.notice ? `<div class="absence-notice">📢 보강 안내: ${a.notice}</div>` : ''}
+    let makeupHtml = '';
+    if(a.makeupSlotId){
+      const mSlot = slots.find(s=>s.id===a.makeupSlotId);
+      if(mSlot) makeupHtml = `<div style="font-size:12px;color:var(--ok-txt);margin-top:4px;padding:5px 9px;background:var(--ok-bg);border-radius:4px;">📅 보강 예약: ${mSlot.date} (${mSlot.day}) ${mSlot.time} · ${mSlot.teacher}</div>`;
+      else if(a.notice) makeupHtml = `<div style="font-size:12px;color:var(--ok-txt);margin-top:4px;padding:5px 9px;background:var(--ok-bg);border-radius:4px;">📅 보강: ${a.notice}</div>`;
+    }
+    return `<div class="absence-item" style="flex-direction:column;align-items:stretch;gap:6px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="absence-status ${statusClass[a.status]||'abs-pending'}">${statusMap[a.status]||'확인 중'}</span>
+        <div class="absence-info" style="flex:1;">
+          <div class="absence-date">${a.date} (${dayName}) ${a.slot}</div>
+          <div class="absence-reason">사유: ${a.reason}</div>
+        </div>
+        <div style="display:flex;gap:5px;">
+          ${a.status==='pending'?`<button class="btn btn-sm btn-danger" onclick="cancelMyAbsence('${a.id}')">결강 취소</button>`:''}
+          ${a.makeupSlotId?`<button class="btn btn-sm btn-danger" onclick="cancelMyMakeup('${a.id}')">보강 취소</button>`:''}
+        </div>
       </div>
-      ${a.status==='pending'?`<button class="btn btn-sm btn-danger" onclick="cancelMyAbsence('${a.id}')">취소</button>`:''}
+      ${a.notice && !a.makeupSlotId ? `<div class="absence-notice">📢 보강 안내: ${a.notice}</div>` : ''}
+      ${makeupHtml}
     </div>`;
   }).join('');
 }
@@ -3753,6 +3766,33 @@ function cancelMyAbsence(absId){
   svAbsences(absences);
   renderMyAbsences();
   toast('결강 신청이 취소됐어요.');
+}
+
+function cancelMyMakeup(absId){
+  if(!currentStudent) return;
+  if(!confirm('보강 예약을 취소할까요?')) return;
+  const absences = ldAbsences();
+  const list = absences[currentStudent.id]||[];
+  const item = list.find(a=>a.id===absId);
+  if(!item || !item.makeupSlotId) return;
+
+  // 슬롯에서 예약 제거
+  const slotId = item.makeupSlotId;
+  if(!slotId.startsWith('admin_')){
+    const slots = ld(K.SLOTS);
+    const sIdx = slots.findIndex(s=>s.id===slotId);
+    if(sIdx!==-1){
+      slots[sIdx].reservations = (slots[sIdx].reservations||[]).filter(r=>r.studentId!==currentStudent.id);
+      sv(K.SLOTS, slots);
+    }
+  }
+
+  // 결강 데이터에서 보강 연결 해제
+  item.makeupSlotId = '';
+  item.status = 'pending';
+  svAbsences(absences);
+  renderMyAbsences();
+  toast('보강 예약이 취소됐어요.');
 }
 
 /* ── admin: render absence list for a student ── */
@@ -4067,8 +4107,8 @@ function renderAdminAbsencePanel(){
     if(a.makeupSlotId){
       const slots = ld(K.SLOTS);
       const slot = slots.find(s=>s.id===a.makeupSlotId);
-      if(slot) makeupInfo = `<span style="font-size:11px;color:var(--ok-txt);font-weight:600;">✓ ${slot.date} ${slot.time}</span>`;
-      else makeupInfo = '<span style="font-size:11px;color:var(--ok-txt);">✓ 예약됨</span>';
+      if(slot) makeupInfo = `<span style="font-size:11px;color:var(--ok-txt);font-weight:600;">✓ ${slot.date} ${slot.time}</span><br/><button class="btn btn-sm btn-danger" style="margin-top:3px;padding:2px 8px;font-size:10px;" onclick="cancelMakeupAdmin('${a.portalId}','${a.id}')">보강 취소</button>`;
+      else makeupInfo = `<span style="font-size:11px;color:var(--ok-txt);">✓ 예약됨</span><br/><button class="btn btn-sm btn-danger" style="margin-top:3px;padding:2px 8px;font-size:10px;" onclick="cancelMakeupAdmin('${a.portalId}','${a.id}')">보강 취소</button>`;
     }
 
     return `<tr style="border-bottom:1px solid var(--border);">
@@ -4124,6 +4164,30 @@ function saveAbsenceNoticeFromPanel(){
   document.getElementById('abs-notice-panel').style.display='none';
   renderAdminAbsencePanel();
   toast('보강 안내가 저장됐어요! 학생에게 바로 표시돼요 😊');
+}
+
+function cancelMakeupAdmin(portalId, absId){
+  if(!confirm('이 학생의 보강 예약을 취소할까요?')) return;
+  const absences = ldAbsences();
+  const item = (absences[portalId]||[]).find(a=>a.id===absId);
+  if(!item || !item.makeupSlotId) return;
+
+  // 슬롯에서 예약 제거
+  const slotId = item.makeupSlotId;
+  if(!slotId.startsWith('admin_')){
+    const slots = ld(K.SLOTS);
+    const sIdx = slots.findIndex(s=>s.id===slotId);
+    if(sIdx!==-1){
+      slots[sIdx].reservations = (slots[sIdx].reservations||[]).filter(r=>r.studentId!==portalId);
+      sv(K.SLOTS, slots);
+    }
+  }
+
+  item.makeupSlotId = '';
+  item.status = 'pending';
+  svAbsences(absences);
+  renderAdminAbsencePanel();
+  toast('보강 예약이 취소됐어요.');
 }
 
 function deleteAbsAdmin(portalId, absId){
