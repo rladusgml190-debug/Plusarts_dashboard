@@ -683,6 +683,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.1rem 0;}
       <div style="font-size:11px;margin-bottom:12px;" id="fb-status">⏳ Firebase 연결 중...</div>
       <div class="sub-tab-bar">
         <button class="sub-tab" id="atab-notices2" onclick="switchAdminTab('notices2')">📢 공지사항</button>
+        <button class="sub-tab" id="atab-weekview" onclick="switchAdminTab('weekview')">📅 주간 수업</button>
         <button class="sub-tab active" id="atab-students" onclick="switchAdminTab('students')">학생 관리</button>
         <button class="sub-tab" id="atab-notices" onclick="switchAdminTab('notices')">안내문</button>
         <button class="sub-tab" id="atab-absence" onclick="switchAdminTab('absence')">🚫 결강 관리</button>
@@ -693,6 +694,24 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.1rem 0;}
         <button class="sub-tab" id="atab-settings" onclick="switchAdminTab('settings')">설정</button>
       </div>
 
+
+      <!-- 주간 수업 현황 -->
+      <div id="apanel-weekview" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <span style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mid);">주간 수업 현황</span>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn btn-sm" onclick="adminWeekOffset--;renderAdminWeekView();">&larr; 이전 주</button>
+            <button class="btn btn-sm" onclick="adminWeekOffset=0;renderAdminWeekView();">이번 주</button>
+            <button class="btn btn-sm" onclick="adminWeekOffset++;renderAdminWeekView();">다음 주 &rarr;</button>
+          </div>
+        </div>
+        <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:1.2rem;">
+          <div class="stat-box"><div class="stat-num red" id="aw-stat-regular">0</div><div class="stat-lbl">정규 수업 인원</div></div>
+          <div class="stat-box"><div class="stat-num" style="color:#1976D2;" id="aw-stat-makeup">0</div><div class="stat-lbl">보강 수업 인원</div></div>
+          <div class="stat-box"><div class="stat-num" id="aw-stat-total">0</div><div class="stat-lbl">주간 총 인원</div></div>
+        </div>
+        <div id="adminWeekViewContent"></div>
+      </div>
 
       <!-- 공지사항 관리 -->
       <div id="apanel-notices2" style="display:none;">
@@ -737,9 +756,8 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.1rem 0;}
             <button class="btn btn-sm btn-red2" onclick="openAdminAbsenceAdd()">+ 결강 추가</button>
             <select id="abs-filter-status" onchange="renderAdminAbsencePanel()" style="padding:6px 10px;font-size:12px;border:1px solid var(--border2);border-radius:4px;background:var(--white);color:var(--black);">
               <option value="">전체</option>
-              <option value="pending">확인 중</option>
-              <option value="confirmed">확인 완료</option>
-              <option value="cancelled">취소됨</option>
+              <option value="makeup_done">보강 예약 완료</option>
+              <option value="makeup_none">보강 미예약</option>
             </select>
           </div>
         </div>
@@ -766,6 +784,26 @@ hr.div{border:none;border-top:1px solid var(--border);margin:1.1rem 0;}
             <tbody id="abs-admin-tbody"></tbody>
           </table>
           <div id="abs-admin-empty" class="empty-state">결강 신청 내역이 없어요.</div>
+        </div>
+
+        <!-- 보강완료 히스토리 -->
+        <div class="card" id="abs-history-wrap" style="display:none;margin-top:16px;padding:0;overflow:hidden;">
+          <div style="padding:12px 14px;background:var(--blue-l);border-bottom:1px solid var(--border);">
+            <span style="font-size:12px;font-weight:700;letter-spacing:.08em;color:#1976D2;">보강 완료 내역</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="background:#F5F5F5;">
+                <th style="padding:8px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--mid);">학생</th>
+                <th style="padding:8px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--mid);">결강 날짜</th>
+                <th style="padding:8px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--mid);">사유</th>
+                <th style="padding:8px 14px;text-align:center;font-size:11px;font-weight:700;color:var(--mid);">상태</th>
+                <th style="padding:8px 14px;text-align:center;font-size:11px;font-weight:700;color:var(--mid);">보강 수업</th>
+                <th style="padding:8px 14px;text-align:center;font-size:11px;font-weight:700;color:var(--mid);">액션</th>
+              </tr>
+            </thead>
+            <tbody id="abs-history-tbody"></tbody>
+          </table>
         </div>
 
         <!-- 보강 안내 입력 패널 -->
@@ -1516,7 +1554,8 @@ function hasScheduleConflict(slot){
 
 function renderBookingSlots(){
   if(!currentStudent)return;
-  const slots=ld(K.SLOTS).filter(s=>s.active);
+  const today=new Date().toISOString().split('T')[0];
+  const slots=ld(K.SLOTS).filter(s=>s.active && s.date>=today);
   const c=document.getElementById('bookingSlotList'), nm=document.getElementById('bookingNoSlot');
   c.innerHTML='';
   if(!slots.length){nm.style.display='block';return;} nm.style.display='none';
@@ -1564,11 +1603,9 @@ function submitBooking(){
   sv(K.SLOTS,slots);
   addStudentLog(currentStudent.id,'booking',`보강 예약: ${slots[idx].date} (${slots[idx].day}) ${slots[idx].time}`);
   const slot=slots[idx];
-  al.innerHTML=`<div class="alert alert-ok">${currentStudent.name}님, 예약 완료! 🎉 이메일 앱이 열리면 발송해주세요.</div>`;
+  al.innerHTML=`<div class="alert alert-ok">${currentStudent.name}님, 예약 완료! 🎉</div>`;
   document.getElementById('bookingFormCard').style.display='none';
   selectedSlotId=null; renderBookingSlots();
-  // ── 이메일 발송 ──
-  sendBookingEmail(currentStudent, slot);
 
   // 구글 시트에 보강예정 기록 (연결된 결강 날짜 찾기)
   const absences = ldAbsences();
@@ -1581,26 +1618,6 @@ function submitBooking(){
     if(!linkedAbs.makeupSlotId){ linkedAbs.makeupSlotId=slot.id; linkedAbs.status='confirmed'; svAbsences(absences); }
   }
   syncMakeupToSheet(currentStudent.name, slot.date, slot.time, slot.teacher, absLabel);
-}
-
-function sendBookingEmail(student, slot){
-  const subject=encodeURIComponent('[플러스아츠] 보강수업 예약 확인');
-  const body=encodeURIComponent(
-    `플러스아츠 보강수업 예약이 완료되었습니다.\n\n`+
-    `━━━━━━━━━━━━━━━━━━━━\n`+
-    `학생명: ${student.name}\n`+
-    `날  짜: ${slot.date} (${slot.day})\n`+
-    `시  간: ${slot.time}\n`+
-    `담당선생님: ${slot.teacher}\n`+
-    `━━━━━━━━━━━━━━━━━━━━\n\n`+
-    `문의: 플러스아츠학원 info@plusart.net`
-  );
-  // 학원 이메일 + 학생 이메일 (있으면 함께)
-  const studentEmail=student.email||'';
-  const toList=['info@plusart.net', studentEmail].filter(Boolean).join(',');
-  const mailtoLink=`mailto:${toList}?subject=${subject}&body=${body}`;
-  // 잠깐 딜레이 후 열기 (UI 업데이트 후)
-  setTimeout(()=>{ window.location.href=mailtoLink; }, 400);
 }
 
 /* ── 학사 캘린더 ── */
@@ -1704,11 +1721,12 @@ function doAdminLogout(){document.getElementById('adminPanel').style.display='no
 function adminBackToLogin(){hidePage('adminPage');showPage('loginPage');}
 
 function switchAdminTab(t){
-  ['notices2','students','notices','absence','makeup','attendance','timetable','teachers','settings'].forEach(x=>{
+  ['notices2','weekview','students','notices','absence','makeup','attendance','timetable','teachers','settings'].forEach(x=>{
     document.getElementById('apanel-'+x).style.display=x===t?'block':'none';
     document.getElementById('atab-'+x).classList.toggle('active',x===t);
   });
   if(t==='notices2') renderNoticeAdmin();
+  if(t==='weekview') renderAdminWeekView();
   if(t==='absence') renderAdminAbsencePanel();
   if(t==='students') renderStudentAdmin();
   if(t==='timetable') renderTTAdminList();
@@ -2026,28 +2044,17 @@ function addSlot(){
   document.getElementById('newDate').value=''; document.getElementById('newMax').value=''; document.getElementById('newTeacher').value='';
   selectedDay=null; selectedTime=null; renderAdminSlots(); setTimeout(()=>al.innerHTML='',2500);
 }
-function renderAdminSlots(){
-  const slots=ld(K.SLOTS), c=document.getElementById('adminSlotGrid'), em=document.getElementById('adminNoSlot');
-  if(!slots.length){c.innerHTML=''; em.style.display='block';return;} em.style.display='none';
-
+function buildSlotGrid(slots, dates, sorted, today, isPastSection){
   const TIMES=['11:00–14:00','14:00–17:00','18:00–21:00'];
   const TIME_LABELS={'11:00–14:00':'오전 11:00–14:00','14:00–17:00':'오후 14:00–17:00','18:00–21:00':'오후 18:00–21:00'};
   const BG=['#FFF8E1','#E8F5E9','#E3F2FD'];
   const BD=['#E6C200','#43A047','#1976D2'];
   const TX=['#7A5A00','#1B5E20','#0D47A1'];
 
-  // 날짜 기준 오름차순 정렬, 고유 날짜 추출
-  const sorted=slots.slice().sort((a,b)=>a.date.localeCompare(b.date));
-  const dates=[...new Set(sorted.map(s=>s.date))];
-
-  // 과거/미래 구분
-  const today=new Date().toISOString().split('T')[0];
-
   let html=`<table class="tt-table"><thead><tr><th style="width:100px;">시간</th>`;
   dates.forEach(d=>{
     const s=sorted.find(sl=>sl.date===d);
-    const isPast=d<today;
-    html+=`<th style="${isPast?'opacity:.5;':''}font-size:12px;">${d.slice(5)}<br/><span style="font-size:10px;color:${isPast?'#888':'#F08080'};">(${s?s.day:''})</span></th>`;
+    html+=`<th style="${isPastSection?'opacity:.5;':''}font-size:12px;">${d.slice(5)}<br/><span style="font-size:10px;color:${isPastSection?'#888':'#F08080'};">(${s?s.day:''})</span></th>`;
   });
   html+=`</tr></thead><tbody>`;
 
@@ -2055,14 +2062,13 @@ function renderAdminSlots(){
     html+=`<tr><td style="font-size:11px;white-space:nowrap;">${TIME_LABELS[time]}</td>`;
     dates.forEach(date=>{
       const slot=sorted.find(s=>s.date===date&&s.time===time);
-      const isPast=date<today;
       if(!slot){
         html+=`<td style="background:var(--gray);"><div class="tt-cell empty-slot">—</div></td>`;
       } else {
         const booked=(slot.reservations||[]).length;
         const full=booked>=slot.max;
         const stuNames=(slot.reservations||[]).map(r=>r.name);
-        html+=`<td style="padding:4px;${isPast?'opacity:.6;':''}">
+        html+=`<td style="padding:4px;${isPastSection?'opacity:.6;':''}">
           <div class="tt-cell" style="background:${BG[ti]};border-color:${BD[ti]};border-width:2px;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">
               <span style="font-weight:700;font-size:12px;color:${TX[ti]};">${slot.teacher}</span>
@@ -2087,6 +2093,35 @@ function renderAdminSlots(){
   });
 
   html+=`</tbody></table>`;
+  return html;
+}
+
+function renderAdminSlots(){
+  const slots=ld(K.SLOTS), c=document.getElementById('adminSlotGrid'), em=document.getElementById('adminNoSlot');
+  if(!slots.length){c.innerHTML=''; em.style.display='block';return;} em.style.display='none';
+
+  const sorted=slots.slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const today=new Date().toISOString().split('T')[0];
+
+  const futureDates=[...new Set(sorted.filter(s=>s.date>=today).map(s=>s.date))];
+  const pastDates=[...new Set(sorted.filter(s=>s.date<today).map(s=>s.date))];
+
+  let html='';
+  if(futureDates.length){
+    html += buildSlotGrid(slots, futureDates, sorted, today, false);
+  } else {
+    html += '<div class="empty-state">예정된 보강 수업이 없어요.</div>';
+  }
+
+  if(pastDates.length){
+    html += `<div style="margin-top:20px;padding:12px 14px;background:#F5F5F5;border-radius:6px 6px 0 0;border:1px solid var(--border);border-bottom:none;">
+      <span style="font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--mid);cursor:pointer;" onclick="const el=document.getElementById('pastSlotGrid');el.style.display=el.style.display==='none'?'block':'none';this.querySelector('span').textContent=el.style.display==='none'?'▶':'▼';">지난 수업 내역 <span>▶</span></span>
+    </div>
+    <div id="pastSlotGrid" style="display:none;border:1px solid var(--border);border-top:none;border-radius:0 0 6px 6px;overflow:auto;">`;
+    html += buildSlotGrid(slots, pastDates, sorted, today, true);
+    html += '</div>';
+  }
+
   c.innerHTML=html;
 }
 function toggleSlot(id){const slots=ld(K.SLOTS),idx=slots.findIndex(s=>s.id===id);if(idx!==-1){slots[idx].active=!slots[idx].active;sv(K.SLOTS,slots);renderAdminSlots();}}
@@ -2577,7 +2612,7 @@ function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     if (data.action === 'attendance') return handleAttendance(data);
-    if (data.action === 'sendEmail') return handleSendEmail(data);
+
     return ContentService.createTextOutput(JSON.stringify({success:false, error:'unknown action'})).setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
     return ContentService.createTextOutput(JSON.stringify({success:false, error:err.toString()})).setMimeType(ContentService.MimeType.JSON);
@@ -2667,20 +2702,7 @@ function handleAttendance(data) {
   return ContentService.createTextOutput(JSON.stringify({success:true, count:records.length, debug:debug})).setMimeType(ContentService.MimeType.JSON);
 }
 
-function handleSendEmail(data) {
-  var to = data.to || '';
-  var subject = data.subject || '';
-  var body = data.body || '';
-  if (!to || !subject || !body) {
-    return ContentService.createTextOutput(JSON.stringify({success:false, error:'missing fields'})).setMimeType(ContentService.MimeType.JSON);
-  }
-  try {
-    MailApp.sendEmail(to, subject, body);
-    return ContentService.createTextOutput(JSON.stringify({success:true})).setMimeType(ContentService.MimeType.JSON);
-  } catch(err) {
-    return ContentService.createTextOutput(JSON.stringify({success:false, error:err.toString()})).setMimeType(ContentService.MimeType.JSON);
-  }
-}`;
+`;
 
 function copyAttAppsScript(){
   navigator.clipboard.writeText(ATT_APPS_SCRIPT_CODE).then(()=>
@@ -2770,7 +2792,6 @@ function startTeacherAutoRefresh(){
   teacherRefreshTimer = setInterval(()=>{
     if(currentTeacherTab==='today') renderTeacherToday();
     if(currentTeacherTab==='week')  renderTeacherWeek();
-    checkAutoAttendanceEmail();
   }, 60000);
 }
 
@@ -3016,6 +3037,142 @@ function renderTeacherWeek(){
   });
 
   document.getElementById('teacherWeekContent').innerHTML = html;
+}
+
+/* ── 관리자 주간 수업 현황 ── */
+let adminWeekOffset = 0;
+
+function renderAdminWeekView(){
+  const content = document.getElementById('adminWeekViewContent');
+  if(!content) return;
+
+  const days = ['화','수','목','금','토'];
+  const dayMap = {'화':2,'수':3,'목':4,'금':5,'토':6};
+  const TIMES = ['11:00–14:00','14:00–17:00','18:00–21:00'];
+  const TIME_LABELS = {'11:00–14:00':'오전 11:00 – 오후 2:00','14:00–17:00':'오후 2:00 – 5:00','18:00–21:00':'오후 6:00 – 9:00'};
+
+  const tt = ld(K.TT);
+  const allSlots = ld(K.SLOTS);
+  const portalStudents = ld(K.STUDENTS);
+  const absData = ldAbsences();
+  const todayStr = getTodayStr();
+  const todayDay = getTodayDay();
+
+  // 주간 날짜 계산 (offset 적용)
+  const baseDate = new Date();
+  baseDate.setDate(baseDate.getDate() + adminWeekOffset * 7);
+  const weekDates = {};
+  days.forEach(d => {
+    const diff = (dayMap[d] - baseDate.getDay() + 7) % 7;
+    const dt = new Date(baseDate);
+    dt.setDate(baseDate.getDate() + (diff === 0 ? 0 : diff));
+    // 만약 오늘이 토요일 이후(일,월)이면 다음주로 보정
+    if(diff === 0 && baseDate.getDay() !== dayMap[d]) dt.setDate(dt.getDate() + 7);
+    weekDates[d] = dt.toISOString().split('T')[0];
+  });
+
+  let weekTotalRegular = 0, weekTotalMakeup = 0;
+  let html = '';
+
+  days.forEach(day => {
+    const dateStr = weekDates[day];
+    const isToday = dateStr === todayStr;
+
+    // 이 날에 해당하는 타임 슬롯 수집
+    const timeSlotsForDay = new Set();
+    tt.filter(e => e.day === day).forEach(e => timeSlotsForDay.add(e.slot));
+    allSlots.filter(s => s.date === dateStr).forEach(s => timeSlotsForDay.add(s.time));
+
+    const sortedTimes = TIMES.filter(t => timeSlotsForDay.has(t));
+    let dayRegular = 0, dayMakeup = 0;
+
+    // 먼저 총 인원 계산
+    sortedTimes.forEach(t => {
+      const reg = getRegularStudentsForSlot(day, t);
+      const mkp = getMakeupStudentsForSlot(dateStr, t);
+      dayRegular += reg.count;
+      dayMakeup += mkp.count;
+    });
+    weekTotalRegular += dayRegular;
+    weekTotalMakeup += dayMakeup;
+
+    const dayTotal = dayRegular + dayMakeup;
+    const monthDay = dateStr.slice(5).replace('-','/');
+
+    html += `<div class="card" style="margin-bottom:12px;padding:0;overflow:hidden;${isToday?'border:2px solid var(--red);':''}">
+      <div style="padding:12px 16px;background:${isToday?'var(--red)':'var(--black)'};color:var(--white);display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-weight:700;font-size:14px;">${day}요일 <span style="font-weight:400;font-size:12px;">${monthDay}</span>${isToday?' <span style="background:white;color:var(--red);font-size:10px;padding:2px 8px;border-radius:3px;margin-left:6px;">TODAY</span>':''}</div>
+        <div style="font-size:12px;">정규 ${dayRegular}명 + 보강 ${dayMakeup}명 = <strong>총 ${dayTotal}명</strong></div>
+      </div>`;
+
+    if(!sortedTimes.length){
+      html += `<div style="padding:16px;font-size:13px;color:var(--mid);text-align:center;">수업 없음</div>`;
+    } else {
+      sortedTimes.forEach(timeSlot => {
+        const reg = getRegularStudentsForSlot(day, timeSlot);
+        const mkp = getMakeupStudentsForSlot(dateStr, timeSlot);
+        const total = reg.count + mkp.count;
+
+        html += `<div style="border-top:1px solid var(--border);padding:12px 16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <span style="font-weight:700;font-size:13px;color:var(--black);">${TIME_LABELS[timeSlot]}</span>
+            <span style="font-size:12px;color:var(--mid);">정규 ${reg.count} + 보강 ${mkp.count} = ${total}명</span>
+          </div>`;
+
+        // 정규 수업
+        if(reg.entries.length){
+          reg.entries.forEach(entry => {
+            const stuList = reg.students.filter(s => s.className === entry.name);
+            // 결강자 체크
+            const absentNames = stuList.filter(s => {
+              const portal = portalStudents.find(p=>p.name===s.name);
+              if(!portal) return false;
+              return (absData[portal.id]||[]).some(a =>
+                a.date===dateStr && a.slot===timeSlot && a.status!=='cancelled'
+              );
+            }).map(s=>s.name);
+            const presentList = stuList.filter(s=>!absentNames.includes(s.name));
+
+            html += `<div style="margin-bottom:8px;padding:8px 12px;background:var(--ok-bg);border-radius:6px;border-left:3px solid var(--ok-txt);">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-weight:700;font-size:13px;color:var(--ok-txt);">정규 | ${entry.name}</span>
+                <span style="font-size:11px;color:var(--mid);">담당: ${entry.teacher} · 출석 ${presentList.length}명${absentNames.length?` · <span style="color:var(--err-txt);font-weight:700;">결강 ${absentNames.length}명</span>`:''}</span>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                ${presentList.map(s=>`<span style="font-size:11px;background:white;border:1px solid var(--border2);border-radius:3px;padding:2px 8px;">${s.name}</span>`).join('')}
+                ${absentNames.map(n=>`<span style="font-size:11px;background:var(--err-bg);border:1px solid #F09595;border-radius:3px;padding:2px 8px;color:var(--err-txt);text-decoration:line-through;">${n} 결강</span>`).join('')}
+                ${!stuList.length?'<span style="font-size:11px;color:var(--mid);">등록 학생 없음</span>':''}
+              </div>
+            </div>`;
+          });
+        }
+
+        // 보강 수업
+        if(mkp.slots.length){
+          mkp.slots.forEach(slot => {
+            const reservations = slot.reservations || [];
+            html += `<div style="margin-bottom:8px;padding:8px 12px;background:#E3F2FD;border-radius:6px;border-left:3px solid #1976D2;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-weight:700;font-size:13px;color:#1976D2;">보강 | ${slot.teacher}</span>
+                <span style="font-size:11px;color:var(--mid);">${reservations.length}/${slot.max}명 예약</span>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                ${reservations.length ? reservations.map(r=>`<span style="font-size:11px;background:white;border:1px solid #90CAF9;border-radius:3px;padding:2px 8px;color:#1565C0;">${r.name}</span>`).join('') : '<span style="font-size:11px;color:var(--mid);">예약자 없음</span>'}
+              </div>
+            </div>`;
+          });
+        }
+
+        html += `</div>`;
+      });
+    }
+    html += `</div>`;
+  });
+
+  content.innerHTML = html;
+  document.getElementById('aw-stat-regular').textContent = weekTotalRegular;
+  document.getElementById('aw-stat-makeup').textContent = weekTotalMakeup;
+  document.getElementById('aw-stat-total').textContent = weekTotalRegular + weekTotalMakeup;
 }
 
 function changeTeacherPassword(){
@@ -3751,110 +3908,6 @@ async function syncMakeupToSheet(studentName, makeupDate, makeupSlot, teacher, a
   } catch(e){ console.warn('보강예정 시트 기록 실패:', e); toast('보강예정 시트 연동 실패','warn'); }
 }
 
-/* ── 출결 이메일 자동 발송 ── */
-const K_ATT_EMAIL_SENT = 'pa_att_email_sent'; // "2026-04-01_21" 형식으로 발송 여부 기록
-const ATT_EMAIL_TO = 'rladusgml190@kakao.com';
-
-function buildAttendanceEmailBody(dateStr){
-  const attData = ldAttendance();
-  const portalStudents = ld(K.STUDENTS);
-  const dayNames=['일','월','화','수','목','금','토'];
-  const dateObj = new Date(dateStr+'T12:00:00');
-  const dayName = dayNames[dateObj.getDay()];
-  const SLOTS = ['11:00–14:00','14:00–17:00','18:00–21:00'];
-  const SLOT_LABELS = {'11:00–14:00':'오전 11:00 – 14:00','14:00–17:00':'오후 14:00 – 17:00','18:00–21:00':'오후 18:00 – 21:00'};
-
-  let body = `[플러스아츠] 출결 기록 — ${dateStr} (${dayName})\n\n`;
-  let hasData = false;
-
-  SLOTS.forEach(slot => {
-    const key = dateStr + '_' + slot;
-    const records = attData[key];
-    if(!records || !Object.keys(records).length) return;
-    hasData = true;
-
-    body += `■ ${SLOT_LABELS[slot]}\n`;
-
-    const statusGroups = {};
-    Object.entries(records).forEach(([sid, v]) => {
-      const st = typeof v === 'string' ? v : (v.status||'');
-      const stu = portalStudents.find(p=>p.id===sid);
-      const name = stu ? stu.name : sid;
-      if(!statusGroups[st]) statusGroups[st] = [];
-      statusGroups[st].push(name);
-    });
-
-    Object.entries(statusGroups).forEach(([st, names]) => {
-      body += `  ${st}: ${names.join(', ')} (${names.length}명)\n`;
-    });
-    body += `\n`;
-  });
-
-  if(!hasData) return null;
-  body += `— 플러스아츠학원 출결 관리 시스템`;
-  return body;
-}
-
-async function sendAttendanceEmail(dateStr){
-  const url = getAttSheetUrl();
-  if(!url){ toast('출결 시트 URL이 설정되지 않았어요.','warn'); return; }
-  const body = buildAttendanceEmailBody(dateStr);
-  if(!body){ toast('해당 날짜에 기록된 출결이 없어요.','warn'); return; }
-
-  const dayNames=['일','월','화','수','목','금','토'];
-  const dayName = dayNames[new Date(dateStr+'T12:00:00').getDay()];
-  const subject = `[플러스아츠] ${dateStr} (${dayName}) 출결 기록`;
-
-  try {
-    toast('출결 이메일 발송 중...');
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {'Content-Type':'text/plain'},
-      body: JSON.stringify({ action: 'sendEmail', to: ATT_EMAIL_TO, subject, body })
-    });
-    const result = await res.json();
-    if(result.success){
-      toast('출결 이메일이 발송됐어요! ✉️');
-      localStorage.setItem(K_ATT_EMAIL_SENT, dateStr+'_sent');
-    } else {
-      toast('이메일 발송 실패: '+(result.error||'알 수 없는 오류'),'warn');
-    }
-  } catch(e){
-    console.error('이메일 발송 실패:', e);
-    toast('이메일 발송 실패. Apps Script를 확인해주세요.','warn');
-  }
-}
-
-// 마지막 수업 종료 시 자동 발송 체크 (매분 호출)
-function checkAutoAttendanceEmail(){
-  const todayStr = getTodayStr();
-  const sentKey = localStorage.getItem(K_ATT_EMAIL_SENT)||'';
-  if(sentKey === todayStr+'_sent') return; // 오늘 이미 발송됨
-
-  const now = new Date();
-  const hour = now.getHours();
-
-  // 마지막 수업 시간대의 종료 시간 확인
-  const attData = ldAttendance();
-  const SLOTS = ['11:00–14:00','14:00–17:00','18:00–21:00'];
-  const endHours = {'11:00–14:00':14, '14:00–17:00':17, '18:00–21:00':21};
-  let lastEndHour = 0;
-  let hasAnyRecord = false;
-  SLOTS.forEach(slot => {
-    const key = todayStr+'_'+slot;
-    if(attData[key] && Object.keys(attData[key]).length > 0){
-      hasAnyRecord = true;
-      const eh = endHours[slot]||0;
-      if(eh > lastEndHour) lastEndHour = eh;
-    }
-  });
-
-  // 마지막 수업 끝난 후 자동 발송
-  if(hasAnyRecord && lastEndHour > 0 && hour >= lastEndHour){
-    sendAttendanceEmail(todayStr);
-  }
-}
-
 /* ═══════════════════════════════════════════════
    ABSENCE (결강) SYSTEM
 ═══════════════════════════════════════════════ */
@@ -4251,8 +4304,6 @@ function absBookSlot(slotId){
   renderAbsMakeupSlots();
   renderMyAbsences();
   document.getElementById('abs-makeup-card').style.display='none';
-  sendBookingEmail(currentStudent, slots[idx]);
-
   // 구글 시트에 보강예정 기록
   const makeupSlot = slots[idx];
   const absParts = absDateStr.split('-');
@@ -4262,6 +4313,27 @@ function absBookSlot(slotId){
 
 /* ── 관리자 결강 관리 패널 ── */
 let absNoticePanelTarget = {portalId:null, absId:null};
+
+function isMakeupCompleted(portalId, abs){
+  if(!abs.makeupSlotId) return false;
+  const att = ldAttendance();
+  // 관리자 지정 보강인 경우 notice에서 날짜/시간 추출 불가 → 슬롯에서 찾기
+  const slots = ld(K.SLOTS);
+  const slot = slots.find(s=>s.id===abs.makeupSlotId);
+  if(slot){
+    const key = slot.date+'_'+slot.time;
+    const rec = att[key]?.[portalId];
+    if(rec && (rec.status==='보강완료' || rec==='보강완료')) return true;
+  }
+  // admin 지정 보강: 모든 출결 키에서 해당 학생의 보강완료 확인
+  if(abs.makeupSlotId.startsWith('admin_')){
+    for(const [key, recs] of Object.entries(att)){
+      const rec = recs[portalId];
+      if(rec && (rec.status==='보강완료' || rec==='보강완료')) return true;
+    }
+  }
+  return false;
+}
 
 function renderAdminAbsencePanel(){
   const absences = ldAbsences();
@@ -4274,15 +4346,21 @@ function renderAdminAbsencePanel(){
     const portal = portalStudents.find(p=>p.id===portalId);
     const name = portal ? portal.name : '알 수 없음';
     list.forEach(a => {
-      allAbs.push({...a, portalId, studentName: name});
+      allAbs.push({...a, portalId, studentName: name, _makeupDone: isMakeupCompleted(portalId, a)});
     });
   });
 
+  // 보강완료 항목 분리
+  const doneAbs = allAbs.filter(a=>a._makeupDone);
+  allAbs = allAbs.filter(a=>!a._makeupDone);
+
   // Apply filter
-  if(filterStatus) allAbs = allAbs.filter(a=>a.status===filterStatus);
+  if(filterStatus === 'makeup_done') allAbs = allAbs.filter(a=>!!a.makeupSlotId);
+  else if(filterStatus === 'makeup_none') allAbs = allAbs.filter(a=>!a.makeupSlotId && a.status!=='cancelled');
 
   // Sort: newest first
   allAbs.sort((a,b)=>b.ts-a.ts);
+  doneAbs.sort((a,b)=>b.ts-a.ts);
 
   // Update stats (always from full data)
   const allFlat = [];
@@ -4345,6 +4423,35 @@ function renderAdminAbsencePanel(){
       <td colspan="6" style="padding:6px 14px;font-size:12px;color:var(--blue);">💬 보강 안내: ${a.notice}</td>
     </tr>`:''}`;
   }).join('');
+
+  // 보강완료 히스토리 섹션
+  const historyWrap = document.getElementById('abs-history-wrap');
+  if(historyWrap){
+    if(!doneAbs.length){
+      historyWrap.style.display='none';
+    } else {
+      historyWrap.style.display='block';
+      const hTbody = document.getElementById('abs-history-tbody');
+      hTbody.innerHTML = doneAbs.map(a => {
+        const dayName = dayNames[new Date(a.date+'T12:00:00').getDay()];
+        const slots = ld(K.SLOTS);
+        const slot = slots.find(s=>s.id===a.makeupSlotId);
+        const makeupInfo = slot ? `${slot.date} ${slot.time}` : '관리자 지정';
+        return `<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:8px 14px;font-weight:700;font-size:13px;">${a.studentName}</td>
+          <td style="padding:8px 14px;font-size:13px;">${a.date} (${dayName})<br/><span style="font-size:11px;color:var(--mid);">${a.slot}</span></td>
+          <td style="padding:8px 14px;font-size:12px;color:var(--mid);">${a.reason}</td>
+          <td style="padding:8px 14px;text-align:center;">
+            <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:3px;background:#E3F2FD;color:#1976D2;">보강완료</span>
+          </td>
+          <td style="padding:8px 14px;text-align:center;font-size:11px;color:var(--ok-txt);font-weight:600;">${makeupInfo}</td>
+          <td style="padding:8px 14px;text-align:center;">
+            <button class="btn btn-sm btn-danger" onclick="deleteAbsAdmin('${a.portalId}','${a.id}')">삭제</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+  }
 }
 
 function confirmAbsenceAdmin(portalId, absId){
@@ -4370,7 +4477,8 @@ function openAbsNoticePanel(portalId, absId, studentName){
 function saveAbsenceNoticeFromPanel(){
   const {portalId, absId} = absNoticePanelTarget;
   if(!portalId||!absId) return;
-  const notice = document.getElementById('abs-notice-input').value.trim();
+  let notice = document.getElementById('abs-notice-input').value.trim();
+  if(notice && !notice.startsWith('보강안내드립니다.')) notice = '보강안내드립니다. ' + notice;
   const absences = ldAbsences();
   const item = (absences[portalId]||[]).find(a=>a.id===absId);
   if(item){ item.notice=notice; item.status='confirmed'; svAbsences(absences); }
@@ -4577,7 +4685,6 @@ function saveAdminMakeupAssign(){
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;">
             <div class="card-title" style="margin-bottom:0;border-bottom:none;padding-bottom:0;">최근 출결 <span>기록</span></div>
-            <button class="btn btn-sm btn-red2" onclick="sendAttendanceEmail(getTodayStr())">📧 오늘 출결 이메일 발송</button>
           </div>
           <hr class="div" style="margin-top:8px;"/>
           <div id="att-history"></div>
